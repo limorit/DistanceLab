@@ -742,6 +742,7 @@ public sealed partial class MainWindow
         if (point is null)
         {
             text.Text = "未选择";
+            ToolTip.SetTip(text, null);
             text.ClearValue(TextBlock.ForegroundProperty);
             return;
         }
@@ -750,8 +751,11 @@ public sealed partial class MainWindow
             : MeasurementCsv.StatusName(_currentMeasurement.Statuses[index]);
         double quality = _currentMeasurement?.Qualities[index] ?? double.NaN;
         text.Text = double.IsFinite(quality)
-            ? $"({point.Value.X:F2}, {point.Value.Y:F2}) px · {status} · q={quality:F3}"
-            : $"({point.Value.X:F2}, {point.Value.Y:F2}) px · {status}";
+            ? $"q={quality:F3} · ({point.Value.X:F1}, {point.Value.Y:F1}) · {status}"
+            : $"({point.Value.X:F1}, {point.Value.Y:F1}) px · {status}";
+        ToolTip.SetTip(text, double.IsFinite(quality)
+            ? $"坐标：({point.Value.X:F2}, {point.Value.Y:F2}) px\n状态：{status}\n质量：q={quality:F5}"
+            : $"坐标：({point.Value.X:F2}, {point.Value.Y:F2}) px\n状态：{status}");
         text.Foreground = _editingPointIndex == index || _pointStates[index] == PointState.Lost
             ? WarningStateBrush
             : ReadyStateBrush;
