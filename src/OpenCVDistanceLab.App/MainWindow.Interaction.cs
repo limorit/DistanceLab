@@ -183,9 +183,12 @@ public sealed partial class MainWindow
         _calibrationZoom = Math.Clamp(oldZoom * factor, 1, 12);
         if (Math.Abs(_calibrationZoom - oldZoom) < 1e-9) return;
         (double baseScale, double baseLeft, double baseTop) = BaseImageTransform();
+        Point layoutOrigin = PreviewImage.Bounds.Position;
         _calibrationOffset = new Vector(
-            pointer.X - (baseLeft + imagePoint.Value.X * baseScale) * _calibrationZoom,
-            pointer.Y - (baseTop + imagePoint.Value.Y * baseScale) * _calibrationZoom);
+            pointer.X - layoutOrigin.X -
+                (baseLeft + imagePoint.Value.X * baseScale) * _calibrationZoom,
+            pointer.Y - layoutOrigin.Y -
+                (baseTop + imagePoint.Value.Y * baseScale) * _calibrationZoom);
         ClampCalibrationZoom();
         ApplyCalibrationTransform();
         UpdatePointUiState();
@@ -441,17 +444,33 @@ public sealed partial class MainWindow
     private (double Scale, double Left, double Top) BaseImageTransform()
     {
         if (_pixelFrame is null) return (1, 0, 0);
-        double scale = Math.Min(ImageHost.Bounds.Width / _pixelFrame.Width, ImageHost.Bounds.Height / _pixelFrame.Height);
-        return (scale, (ImageHost.Bounds.Width - _pixelFrame.Width * scale) / 2,
-            (ImageHost.Bounds.Height - _pixelFrame.Height * scale) / 2);
+        double width = PreviewImage.Bounds.Width > 0
+            ? PreviewImage.Bounds.Width
+            : ImageHost.Bounds.Width;
+        double height = PreviewImage.Bounds.Height > 0
+            ? PreviewImage.Bounds.Height
+            : ImageHost.Bounds.Height;
+        double scale = Math.Min(width / _pixelFrame.Width, height / _pixelFrame.Height);
+        return (scale, (width - _pixelFrame.Width * scale) / 2,
+            (height - _pixelFrame.Height * scale) / 2);
     }
 
     private (double Scale, double Left, double Top) ImageTransform()
     {
         (double scale, double left, double top) = BaseImageTransform();
+        Matrix? toHost = PreviewImage.TransformToVisual(ImageHost);
+        if (toHost is not null)
+        {
+            Point origin = toHost.Value.Transform(new Point(left, top));
+            Point horizontal = toHost.Value.Transform(new Point(left + scale, top));
+            double actualScale = PointDistance(origin, horizontal);
+            if (actualScale > 0 && double.IsFinite(actualScale))
+                return (actualScale, origin.X, origin.Y);
+        }
+        Point layoutOrigin = PreviewImage.Bounds.Position;
         return (scale * _calibrationZoom,
-            left * _calibrationZoom + _calibrationOffset.X,
-            top * _calibrationZoom + _calibrationOffset.Y);
+            layoutOrigin.X + left * _calibrationZoom + _calibrationOffset.X,
+            layoutOrigin.Y + top * _calibrationZoom + _calibrationOffset.Y);
     }
 
     private PointD? CanvasToImage(Point canvas, bool clamp)
@@ -497,16 +516,19 @@ public sealed partial class MainWindow
         (double scale, double left, double top) = BaseImageTransform();
         double width = _pixelFrame.Width * scale * _calibrationZoom;
         double height = _pixelFrame.Height * scale * _calibrationZoom;
+        Point layoutOrigin = PreviewImage.Bounds.Position;
+        double transformedLeft = layoutOrigin.X + left * _calibrationZoom;
+        double transformedTop = layoutOrigin.Y + top * _calibrationZoom;
         double x = width >= ImageHost.Bounds.Width
             ? Math.Clamp(_calibrationOffset.X,
-                ImageHost.Bounds.Width - (left + _pixelFrame.Width * scale) * _calibrationZoom,
-                -left * _calibrationZoom)
-            : (ImageHost.Bounds.Width - width) / 2 - left * _calibrationZoom;
+                ImageHost.Bounds.Width - width - transformedLeft,
+                -transformedLeft)
+            : (ImageHost.Bounds.Width - width) / 2 - transformedLeft;
         double y = height >= ImageHost.Bounds.Height
             ? Math.Clamp(_calibrationOffset.Y,
-                ImageHost.Bounds.Height - (top + _pixelFrame.Height * scale) * _calibrationZoom,
-                -top * _calibrationZoom)
-            : (ImageHost.Bounds.Height - height) / 2 - top * _calibrationZoom;
+                ImageHost.Bounds.Height - height - transformedTop,
+                -transformedTop)
+            : (ImageHost.Bounds.Height - height) / 2 - transformedTop;
         _calibrationOffset = new Vector(x, y);
     }
 
