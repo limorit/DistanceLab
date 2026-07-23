@@ -6,8 +6,8 @@
   <key>CFBundleName</key><string>Distance Lab</string>
   <key>CFBundleDisplayName</key><string>OpenCV Distance Lab</string>
   <key>CFBundleIdentifier</key><string>lab.materials.opencvdistancelab</string>
-  <key>CFBundleVersion</key><string>2.0.9</string>
-  <key>CFBundleShortVersionString</key><string>2.0.9</string>
+  <key>CFBundleVersion</key><string>2.0.10</string>
+  <key>CFBundleShortVersionString</key><string>2.0.10</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>app-icon.icns</string>
   <key>NSHighResolutionCapable</key><true/>
