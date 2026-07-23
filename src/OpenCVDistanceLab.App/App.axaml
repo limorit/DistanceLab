@@ -1,11 +1,11 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="OpenCVDistanceLab.App.App"
-             Name="OpenCV Distance Lab"
+             Name="DistanceLab"
              RequestedThemeVariant="Default">
   <NativeMenu.Menu>
     <NativeMenu>
-      <NativeMenuItem Header="关于 OpenCV Distance Lab…" Click="AppAboutMenu_Click" />
+      <NativeMenuItem Header="关于 DistanceLab…" Click="AppAboutMenu_Click" />
     </NativeMenu>
   </NativeMenu.Menu>
   <Application.Resources>

@@ -87,7 +87,7 @@ public sealed partial class MainWindow
     {
         IStorageFile? file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "保存 OpenCV Distance Lab 参数",
+            Title = "保存 DistanceLab 参数",
             SuggestedFileName = "distance-lab.ocvsettings.json",
             DefaultExtension = "json",
             FileTypeChoices = [new FilePickerFileType("OpenCV 设置") { Patterns = ["*.ocvsettings.json", "*.json"] }],
@@ -110,7 +110,7 @@ public sealed partial class MainWindow
     {
         IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "读取 OpenCV Distance Lab 参数",
+            Title = "读取 DistanceLab 参数",
             AllowMultiple = false,
             FileTypeFilter = [new FilePickerFileType("OpenCV 设置") { Patterns = ["*.ocvsettings.json", "*.json"] }]
         });
@@ -160,8 +160,8 @@ public sealed partial class MainWindow
     }
 
     internal Task ShowAboutAsync() =>
-        MessageDialog.Show(this, "关于 OpenCV Distance Lab",
-            "OpenCV Distance Lab 2.0.14\nAvalonia 跨平台界面 + C++20/OpenCV 原生追踪\n支持 Windows x64、macOS Apple Silicon 和 Intel。");
+        MessageDialog.Show(this, "关于 DistanceLab",
+            "DistanceLab 2.0.15\nAvalonia 跨平台界面 + C++20/OpenCV 原生追踪\n支持 Windows x64、macOS Apple Silicon 和 Intel。");
 
     private async void AboutMenu_Click(object? sender, RoutedEventArgs e) =>
         await ShowAboutAsync();

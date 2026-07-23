@@ -25,7 +25,7 @@ fi
 native_build="$root/build/native/$rid"
 native_output="$root/artifacts/native/$rid"
 publish_output="$root/artifacts/publish/$rid"
-app="$root/artifacts/products/$rid/OpenCV Distance Lab.app"
+app="$root/artifacts/products/$rid/DistanceLab.app"
 
 "$cmake_command" -S "$root" -B "$native_build" -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$architecture" \
@@ -129,7 +129,7 @@ while IFS= read -r dylib; do
 done < <(find "$app/Contents/Frameworks" -type f -name '*.dylib')
 
 identity="${APPLE_SIGN_IDENTITY:--}"
-main_executable="$app/Contents/MacOS/OpenCVDistanceLab"
+main_executable="$app/Contents/MacOS/DistanceLab"
 while IFS= read -r binary; do
   [[ "$binary" == "$main_executable" ]] && continue
   if [[ "$identity" == "-" ]]; then
@@ -151,7 +151,7 @@ else
 fi
 
 if [[ -n "${APPLE_NOTARY_PROFILE:-}" ]] && [[ "$identity" != "-" ]]; then
-  archive="$root/artifacts/products/$rid/OpenCVDistanceLab.zip"
+  archive="$root/artifacts/products/$rid/DistanceLab.zip"
   ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
   xcrun notarytool submit "$archive" --keychain-profile "$APPLE_NOTARY_PROFILE" --wait
   xcrun stapler staple "$app"

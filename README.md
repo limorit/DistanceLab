@@ -1,4 +1,4 @@
-# OpenCV Distance Lab
+# DistanceLab
 
 用于材料原位拉伸图像序列的跨平台双点距离追踪器。界面使用 Avalonia 12，追踪后端使用 C++20 和 OpenCV 4；同一套产品代码支持 Windows x64、Apple Silicon macOS 和 Intel macOS。
 
@@ -53,7 +53,7 @@ Intel：
 产物位于：
 
 ```text
-artifacts/products/osx-arm64/OpenCV Distance Lab.app
+artifacts/products/osx-arm64/DistanceLab.app
 ```
 
 脚本会递归收集非系统 `.dylib` 并重写加载路径。本机测试使用临时签名；正式发布时设置：
@@ -90,7 +90,7 @@ dotnet run --project tests/OpenCVDistanceLab.Core.Tests
 原生库会在平台构建过程中自动运行自检。已发布产品也支持：
 
 ```bash
-OpenCVDistanceLab --native-self-test
+DistanceLab --native-self-test
 ```
 
 ## 输出

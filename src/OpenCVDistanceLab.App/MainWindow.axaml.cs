@@ -133,7 +133,7 @@ public sealed partial class MainWindow : Window
         catch (Exception error)
         {
             SetStatus("初始化失败。", true);
-            await MessageDialog.Show(this, "无法启动 OpenCV Distance Lab", error.Message);
+            await MessageDialog.Show(this, "无法启动 DistanceLab", error.Message);
         }
     }
 
@@ -200,7 +200,7 @@ public sealed partial class MainWindow : Window
         ProgressText.Text = "0%";
         WorkDirectoryText.Text = folder;
         ToolTip.SetTip(WorkDirectoryText, folder);
-        Title = $"OpenCV Distance Lab — {new DirectoryInfo(folder).Name}";
+        Title = $"DistanceLab — {new DirectoryInfo(folder).Name}";
         FrameText.Text = $"帧 0 / {images.Count - 1:N0}";
         StepBadge.Text = "步骤 1 / 3";
         InteractionHint.Text = "点击“标定比例尺”，然后在图像中画线";

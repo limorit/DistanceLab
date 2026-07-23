@@ -61,4 +61,4 @@ if (Test-Path -LiteralPath $vswhere) {
 }
 
 Write-Host "Windows product: $publishOutput"
-Write-Host "Run: $(Join-Path $publishOutput 'OpenCVDistanceLab.exe')"
+Write-Host "Run: $(Join-Path $publishOutput 'DistanceLab.exe')"

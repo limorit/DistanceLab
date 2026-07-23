@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:OpenCVDistanceLab.App"
         x:Class="OpenCVDistanceLab.App.MainWindow"
-        Title="OpenCV Distance Lab"
+        Title="DistanceLab"
         Width="1500" Height="940" MinWidth="1180" MinHeight="760"
         Classes="main-window"
         WindowStartupLocation="CenterScreen"
@@ -62,9 +62,9 @@
       <Grid ColumnDefinitions="280,*,Auto">
         <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <Image Width="50" Height="50"
-                 Source="avares://OpenCVDistanceLab/Assets/app-icon.png" />
+                 Source="avares://DistanceLab/Assets/app-icon.png" />
           <StackPanel VerticalAlignment="Center" Spacing="2">
-            <TextBlock Text="OpenCV Distance Lab" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Text="DistanceLab" FontSize="16" FontWeight="SemiBold" />
             <TextBlock x:Name="WorkDirectoryText" Width="210"
                        Text="尚未选择工作目录" TextTrimming="CharacterEllipsis"
                        Classes="muted" FontSize="11" />
