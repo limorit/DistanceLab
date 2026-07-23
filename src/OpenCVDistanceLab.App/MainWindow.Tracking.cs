@@ -65,6 +65,7 @@ public sealed partial class MainWindow
             _running = false;
             _paused = false;
             _pauseConfirmed = false;
+            UpdateRecognitionWindowDescription(false);
             _visualSession++;
             DisposePendingSnapshot();
             _tracker?.Dispose();
@@ -132,6 +133,7 @@ public sealed partial class MainWindow
         await RecordFrameAsync(csv, 0, initial, initialDistance);
         SetStatus($"OpenCV 跨平台原生追踪已开始；起始截图：{Path.GetFileName(startSnapshot)}", false);
         _trackingClock.Restart();
+        _lastRecognitionRefreshTicks = 0;
         _etaTimer.Start();
 
         Dictionary<int, Task<NativeBackend.PreparedFrame>> preparedTasks = [];
@@ -171,11 +173,31 @@ public sealed partial class MainWindow
                 {
                     SchedulePreparedFrame(preparedTasks, frame + 2);
                     TrackingSettings settings = ReadTrackingSettings();
-                    (TrackMeasurement measurement, NativeBackend.TrackerSnapshot snapshot) = await Task.Run(() =>
-                    {
-                        TrackMeasurement result = _tracker!.Step(prepared, settings);
-                        return (result, _tracker.Snapshot());
-                    }, token);
+                    bool recognitionDue = _lastRecognitionRefreshTicks == 0 ||
+                        Stopwatch.GetElapsedTime(_lastRecognitionRefreshTicks).TotalMilliseconds >= 33 ||
+                        frame == _imagePaths.Count - 1;
+                    (TrackMeasurement measurement,
+                        NativeBackend.TrackerSnapshot snapshot,
+                        NativeBackend.RecognitionPatches? recognition) = await Task.Run(() =>
+                        {
+                            TrackMeasurement result = _tracker!.Step(prepared, settings);
+                            NativeBackend.TrackerSnapshot currentSnapshot = _tracker.Snapshot();
+                            NativeBackend.RecognitionPatches? livePatches = null;
+                            if (recognitionDue || result.Valid.Any(valid => !valid))
+                            {
+                                try
+                                {
+                                    livePatches = currentSnapshot.RenderRecognitionPatches(
+                                        result.Points, settings.WindowSize);
+                                }
+                                catch
+                                {
+                                    // The full-frame preview remains available if a point
+                                    // temporarily leaves the valid patch extraction area.
+                                }
+                            }
+                            return (result, currentSnapshot, livePatches);
+                        }, token);
                     _currentMeasurement = measurement;
                     _trackingPoints[0] = measurement.Points[0];
                     _trackingPoints[1] = measurement.Points[1];
@@ -183,6 +205,11 @@ public sealed partial class MainWindow
                         _pointStates[index] = measurement.Valid[index] ? PointState.Ready : PointState.Lost;
                     _pointCount = 2;
                     SetCurrentFrame(frame, measurement);
+                    if (recognition is not null)
+                    {
+                        ApplyRecognitionPatches(recognition);
+                        _lastRecognitionRefreshTicks = Stopwatch.GetTimestamp();
+                    }
                     bool lost = settings.PauseOnLoss && measurement.Valid.Any(valid => !valid);
                     if (lost || frame == _imagePaths.Count - 1)
                         await RenderExactSnapshotAsync(frame, snapshot, ReadDisplaySettings());

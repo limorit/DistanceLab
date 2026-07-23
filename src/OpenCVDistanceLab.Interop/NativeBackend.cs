@@ -96,6 +96,14 @@ public static class NativeBackend
         nint preview, int previewStride, nint tracking, int trackingStride);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int dt_tracker_snapshot_render_patches(
+        nint snapshot,
+        [In, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] NativePoint[] points,
+        int patchSize,
+        nint point1, int point1Stride,
+        nint point2, int point2Stride);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     private static extern int dt_tracker_self_test();
 
     public static string LastError =>
@@ -258,6 +266,30 @@ public static class NativeBackend
                 _width, _height, previewStride, preview, trackingStride, tracking);
         }
 
+        public RecognitionPatches RenderRecognitionPatches(
+            IReadOnlyList<PointD> points, int requestedSize)
+        {
+            ObjectDisposedException.ThrowIf(_handle == 0, this);
+            if (points.Count != 2)
+                throw new ArgumentException("实时识别预览需要两个追踪点。", nameof(points));
+            int size = Math.Max(15, requestedSize) | 1;
+            NativePoint[] nativePoints =
+            [
+                new(points[0].X, points[0].Y),
+                new(points[1].X, points[1].Y)
+            ];
+            byte[] point1 = new byte[checked(size * size)];
+            byte[] point2 = new byte[checked(size * size)];
+            WithPinnedBuffers(point1, point2, (point1Pointer, point2Pointer) =>
+            {
+                if (dt_tracker_snapshot_render_patches(
+                        _handle, nativePoints, size,
+                        point1Pointer, size, point2Pointer, size) == 0)
+                    throw new InvalidOperationException(LastError);
+            });
+            return new RecognitionPatches(size, point1, point2);
+        }
+
         public void Dispose()
         {
             if (_handle == 0) return;
@@ -268,6 +300,8 @@ public static class NativeBackend
 
         ~TrackerSnapshot() => Dispose();
     }
+
+    public sealed record RecognitionPatches(int Size, byte[] Point1, byte[] Point2);
 
     private static TrackMeasurement FromNative(NativeResult result) => new(
         [new PointD(result.Point0.X, result.Point0.Y), new PointD(result.Point1.X, result.Point1.Y)],

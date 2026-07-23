@@ -705,6 +705,36 @@ int dt_tracker_snapshot_render(
     });
 }
 
+int dt_tracker_snapshot_render_patches(
+    void* snapshot, const DtPoint* points, int patchSize,
+    std::uint8_t* point1, int point1Stride,
+    std::uint8_t* point2, int point2Stride) {
+    return protect([&] {
+        if (!snapshot || !points || !point1 || !point2)
+            throw std::runtime_error("Invalid recognition patch render argument.");
+        if (patchSize < 1 || point1Stride < patchSize || point2Stride < patchSize)
+            throw std::runtime_error("Recognition patch dimensions are invalid.");
+        const auto* frame = static_cast<TrackerSnapshot*>(snapshot);
+        std::array<std::uint8_t*, 2> destinations{point1, point2};
+        std::array<int, 2> strides{point1Stride, point2Stride};
+        for (int index = 0; index < 2; ++index) {
+            const cv::Point2f center(
+                static_cast<float>(points[index].x),
+                static_cast<float>(points[index].y));
+            if (!inside(frame->gray, center, 1))
+                throw std::runtime_error("Recognition point is outside the current frame.");
+            cv::Mat patch;
+            cv::getRectSubPix(
+                frame->gray, cv::Size(patchSize, patchSize), center, patch, CV_8U);
+            for (int y = 0; y < patch.rows; ++y) {
+                std::memcpy(
+                    destinations[index] + static_cast<std::size_t>(y) * strides[index],
+                    patch.ptr(y), static_cast<std::size_t>(patch.cols));
+            }
+        }
+    });
+}
+
 int dt_tracker_self_test() {
     return protect([] {
         cv::Mat source(160, 220, CV_8U);

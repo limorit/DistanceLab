@@ -102,4 +102,12 @@ DT_API int dt_tracker_snapshot_render(
     int previewStride,
     std::uint8_t* destinationTrackingGray,
     int trackingStride);
+DT_API int dt_tracker_snapshot_render_patches(
+    void* snapshot,
+    const DtPoint* points,
+    int patchSize,
+    std::uint8_t* destinationPoint1,
+    int point1Stride,
+    std::uint8_t* destinationPoint2,
+    int point2Stride);
 DT_API int dt_tracker_self_test();

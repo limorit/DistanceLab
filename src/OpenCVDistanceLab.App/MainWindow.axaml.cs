@@ -92,6 +92,7 @@ public sealed partial class MainWindow : Window
     private DisplaySettings? _pendingSnapshotSettings;
     private bool _visualWorkerRunning;
     private long _visualSession;
+    private long _lastRecognitionRefreshTicks;
 
     public MainWindow()
     {

@@ -1,5 +1,6 @@
 #include "distance_tracker_native.h"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -58,9 +59,29 @@ bool testUnicodeImageIo() {
                         preview.data(), width * 4) != 0 &&
         dt_image_render_tracking_input(image, tracking.data(), width) != 0;
     dt_image_close(image);
+    DtPoint points[2]{{18.0, 18.0}, {29.0, 18.0}};
+    DtTrackerSettings settings{15, 10, 0.48, 1.5};
+    void* tracker = dt_tracker_create(encodedPath.c_str(), points, &settings);
+    int snapshotWidth = 0;
+    int snapshotHeight = 0;
+    void* snapshot = tracker == nullptr
+        ? nullptr
+        : dt_tracker_snapshot_create(tracker, &snapshotWidth, &snapshotHeight);
+    constexpr int patchSize = 15;
+    std::array<std::uint8_t, patchSize * patchSize> point1{};
+    std::array<std::uint8_t, patchSize * patchSize> point2{};
+    const bool patchesRendered =
+        snapshot != nullptr &&
+        dt_tracker_snapshot_render_patches(
+            snapshot, points, patchSize,
+            point1.data(), patchSize, point2.data(), patchSize) != 0 &&
+        snapshotWidth == expectedWidth && snapshotHeight == expectedHeight;
+    if (snapshot != nullptr) dt_tracker_snapshot_destroy(snapshot);
+    if (tracker != nullptr) dt_tracker_destroy(tracker);
     std::filesystem::remove_all(directory, ignored);
-    if (!rendered) std::cerr << "Image render failed: " << dt_last_error() << '\n';
-    return rendered;
+    if (!rendered || !patchesRendered)
+        std::cerr << "Image or recognition patch render failed: " << dt_last_error() << '\n';
+    return rendered && patchesRendered;
 }
 
 } // namespace

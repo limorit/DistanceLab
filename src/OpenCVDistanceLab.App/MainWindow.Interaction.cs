@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using OpenCVDistanceLab.Core;
+using OpenCVDistanceLab.Interop;
 using System.Runtime.InteropServices;
 
 namespace OpenCVDistanceLab.App;
@@ -596,12 +597,36 @@ public sealed partial class MainWindow
 
     private void RefreshRecognitionWindows()
     {
-        RecognitionWindowSizeText.Text =
-            $"OpenCV CLAHE 追踪输入 · 稳定窗口 {ReadTrackingSettings().WindowSize} × {ReadTrackingSettings().WindowSize} px";
+        UpdateRecognitionWindowDescription(_running);
         ReplaceRecognitionBitmap(0, CreateRecognitionPatch(GetDisplayedPoint(0), ReadTrackingSettings().WindowSize));
         ReplaceRecognitionBitmap(1, CreateRecognitionPatch(GetDisplayedPoint(1), ReadTrackingSettings().WindowSize));
         UpdateRecognitionText(0, P1RecognitionStateText);
         UpdateRecognitionText(1, P2RecognitionStateText);
+    }
+
+    private void ApplyRecognitionPatches(NativeBackend.RecognitionPatches patches)
+    {
+        UpdateRecognitionWindowDescription(true);
+        ReplaceRecognitionBitmap(
+            0, CreateBitmap(
+                patches.Point1, patches.Size, patches.Size, patches.Size,
+                PixelFormats.Gray8, AlphaFormat.Opaque));
+        ReplaceRecognitionBitmap(
+            1, CreateBitmap(
+                patches.Point2, patches.Size, patches.Size, patches.Size,
+                PixelFormats.Gray8, AlphaFormat.Opaque));
+        UpdateRecognitionText(0, P1RecognitionStateText);
+        UpdateRecognitionText(1, P2RecognitionStateText);
+    }
+
+    private void UpdateRecognitionWindowDescription(bool live)
+    {
+        int size = ReadTrackingSettings().WindowSize;
+        RecognitionWindowSizeText.Text = live
+            ? $"● 实时 · OpenCV CLAHE · {size} × {size} px"
+            : $"OpenCV CLAHE 追踪输入 · 稳定窗口 {size} × {size} px";
+        if (live) RecognitionWindowSizeText.Foreground = ReadyStateBrush;
+        else RecognitionWindowSizeText.ClearValue(TextBlock.ForegroundProperty);
     }
 
     private PointD? GetDisplayedPoint(int index) => _editingPointIndex == index && _editingPoint is not null
