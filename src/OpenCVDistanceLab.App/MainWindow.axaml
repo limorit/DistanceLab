@@ -151,10 +151,10 @@
             </Grid>
           </Border>
 
-          <Border Grid.Row="1" Padding="18,13,18,14"
+          <Border Grid.Row="1" Padding="18,10"
                   BorderBrush="{DynamicResource ThemeBorderLowBrush}"
                   BorderThickness="0,0,0,1">
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="8">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="2">
                   <TextBlock Text="识别预览" Classes="section-title" />
@@ -172,21 +172,25 @@
               <Grid ColumnDefinitions="*,12,*">
                 <StackPanel Spacing="5">
                   <TextBlock Text="P1" FontWeight="SemiBold" />
-                  <Border Height="120" Background="#101114"
+                  <Border Height="104" Background="#101114"
                           CornerRadius="10" ClipToBounds="True">
                     <Image x:Name="P1RecognitionImage" Stretch="Uniform" />
                   </Border>
                   <TextBlock x:Name="P1RecognitionStateText" Text="未选择"
-                             Classes="muted" FontSize="10.5" TextWrapping="Wrap" />
+                             Classes="muted" FontSize="10.5"
+                             TextWrapping="NoWrap"
+                             TextTrimming="CharacterEllipsis" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Spacing="5">
                   <TextBlock Text="P2" FontWeight="SemiBold" />
-                  <Border Height="120" Background="#101114"
+                  <Border Height="104" Background="#101114"
                           CornerRadius="10" ClipToBounds="True">
                     <Image x:Name="P2RecognitionImage" Stretch="Uniform" />
                   </Border>
                   <TextBlock x:Name="P2RecognitionStateText" Text="未选择"
-                             Classes="muted" FontSize="10.5" TextWrapping="Wrap" />
+                             Classes="muted" FontSize="10.5"
+                             TextWrapping="NoWrap"
+                             TextTrimming="CharacterEllipsis" />
                 </StackPanel>
               </Grid>
             </StackPanel>
@@ -321,30 +325,29 @@
             </TabItem>
 
             <TabItem Header="数据">
-              <Grid RowDefinitions="Auto,*" Margin="18,16,18,20">
-                <StackPanel Spacing="10">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Spacing="2">
-                      <TextBlock Text="数据曲线" Classes="section-title" />
-                      <TextBlock x:Name="PlotSourceText"
-                                 Text="数据源：实时追踪（0 条）"
-                                 Classes="muted" FontSize="11" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="实时数据"
-                            Click="ShowLiveButton_Click" />
-                  </Grid>
-                  <Grid ColumnDefinitions="18,*,30,*">
-                    <TextBlock Text="X" VerticalAlignment="Center" />
-                    <ComboBox x:Name="XFieldCombo" Grid.Column="1"
-                              SelectionChanged="PlotField_Changed" />
-                    <TextBlock Grid.Column="2" Text="Y" VerticalAlignment="Center"
-                               HorizontalAlignment="Center" />
-                    <ComboBox x:Name="YFieldCombo" Grid.Column="3"
-                              SelectionChanged="PlotField_Changed" />
-                  </Grid>
-                </StackPanel>
-                <local:PlotControl x:Name="LivePlot" Grid.Row="1"
-                                   Margin="0,14,0,0" MinHeight="220" />
+              <Grid RowDefinitions="Auto,10,Auto,14,*"
+                    Margin="18,16,18,20"
+                    ClipToBounds="True">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="数据曲线" Classes="section-title" />
+                    <TextBlock x:Name="PlotSourceText"
+                               Text="数据源：实时追踪（0 条）"
+                               Classes="muted" FontSize="11" />
+                  </StackPanel>
+                  <Button Grid.Column="1" Content="实时数据"
+                          Click="ShowLiveButton_Click" />
+                </Grid>
+                <Grid Grid.Row="2" ColumnDefinitions="18,*,30,*">
+                  <TextBlock Text="X" VerticalAlignment="Center" />
+                  <ComboBox x:Name="XFieldCombo" Grid.Column="1"
+                            SelectionChanged="PlotField_Changed" />
+                  <TextBlock Grid.Column="2" Text="Y" VerticalAlignment="Center"
+                             HorizontalAlignment="Center" />
+                  <ComboBox x:Name="YFieldCombo" Grid.Column="3"
+                            SelectionChanged="PlotField_Changed" />
+                </Grid>
+                <local:PlotControl x:Name="LivePlot" Grid.Row="4" />
               </Grid>
             </TabItem>
           </TabControl>
