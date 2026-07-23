@@ -61,13 +61,16 @@ public sealed partial class MainWindow
             _currentMeasurement = null;
             await RefreshPreviewAsync(true);
         }
+        ResetCalibrationZoom();
         _editingPointIndex = index;
         _mode = index == 0 ? InteractionMode.EditP1 : InteractionMode.EditP2;
         _editingPoint = _pointStates[index] == PointState.Missing
             ? DefaultPointPosition(index)
             : ClampPointToImage(_trackingPoints[index]);
         ImageHost.Focus();
-        SetStatus($"P{index + 1} 调整中：点击、拖动或使用方向键，再次点击按钮确认。", true);
+        SetStatus(index == 0
+            ? "P1 调整中：滚轮缩放、右键拖图；按住 Shift 锁定水平或垂直方向。"
+            : "P2 调整中：滚轮缩放、右键拖图；按住 Shift 对齐 P1 的水平或垂直十字线。", true);
         UpdatePointUiState();
         DrawOverlay();
         UpdateControls();
@@ -77,7 +80,7 @@ public sealed partial class MainWindow
     {
         PointerPoint current = e.GetCurrentPoint(ImageHost);
         Point canvas = e.GetPosition(ImageHost);
-        if (current.Properties.IsRightButtonPressed && _mode == InteractionMode.Calibration)
+        if (current.Properties.IsRightButtonPressed && IsImageEditMode())
         {
             _panning = true;
             _pointerStart = canvas;
@@ -96,7 +99,9 @@ public sealed partial class MainWindow
         }
         else if (_editingPointIndex is not null)
         {
-            _editingPoint = ClampPointToImage(imagePoint.Value);
+            _pointDragAnchor = _editingPoint;
+            _editingPoint = ConstrainEditingPoint(
+                imagePoint.Value, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _draggingPoint = true;
             e.Pointer.Capture(ImageHost);
             UpdatePointUiState();
@@ -121,7 +126,8 @@ public sealed partial class MainWindow
             PointD? point = CanvasToImage(e.GetPosition(ImageHost), true);
             if (point is not null)
             {
-                _editingPoint = ClampPointToImage(point.Value);
+                _editingPoint = ConstrainEditingPoint(
+                    point.Value, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 UpdatePointUiState();
                 DrawOverlay();
             }
@@ -147,8 +153,11 @@ public sealed partial class MainWindow
         if (_draggingPoint)
         {
             PointD? point = CanvasToImage(e.GetPosition(ImageHost), true);
-            if (point is not null) _editingPoint = ClampPointToImage(point.Value);
+            if (point is not null)
+                _editingPoint = ConstrainEditingPoint(
+                    point.Value, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
             _draggingPoint = false;
+            _pointDragAnchor = null;
             e.Pointer.Capture(null);
             UpdatePointUiState();
             DrawOverlay();
@@ -165,7 +174,7 @@ public sealed partial class MainWindow
 
     private void ImageHost_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        if (_mode != InteractionMode.Calibration || _pixelFrame is null) return;
+        if (!IsImageEditMode() || _pixelFrame is null) return;
         Point pointer = e.GetPosition(ImageHost);
         PointD? imagePoint = CanvasToImage(pointer, true);
         if (imagePoint is null) return;
@@ -324,10 +333,13 @@ public sealed partial class MainWindow
 
     private void CancelPointEdit()
     {
+        bool wasEditing = _mode is InteractionMode.EditP1 or InteractionMode.EditP2;
         _editingPointIndex = null;
         _editingPoint = null;
+        _pointDragAnchor = null;
         _draggingPoint = false;
         if (_mode is InteractionMode.EditP1 or InteractionMode.EditP2) _mode = InteractionMode.None;
+        if (wasEditing) ResetCalibrationZoom();
     }
 
     private void ClearInitialTrackingPoints()
@@ -416,7 +428,10 @@ public sealed partial class MainWindow
         };
         if (delta != default)
         {
-            _editingPoint = ClampPointToImage(_editingPoint.Value + delta);
+            PointD candidate = _editingPoint.Value + delta;
+            _editingPoint = e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                ? ConstrainEditingPoint(candidate, true)
+                : ClampPointToImage(candidate);
             UpdatePointUiState();
             DrawOverlay();
             e.Handled = true;
@@ -501,6 +516,19 @@ public sealed partial class MainWindow
         _calibrationZoom = 1;
         _calibrationOffset = default;
         ApplyCalibrationTransform();
+    }
+
+    private bool IsImageEditMode() =>
+        _mode == InteractionMode.Calibration || _editingPointIndex is not null;
+
+    private PointD ConstrainEditingPoint(PointD point, bool constrain)
+    {
+        if (!constrain || _editingPointIndex is null)
+            return ClampPointToImage(point);
+        PointD? anchor = _editingPointIndex == 1 && _pointStates[0] != PointState.Missing
+            ? _trackingPoints[0]
+            : _pointDragAnchor;
+        return ClampPointToImage(anchor is null ? point : Constrain(anchor.Value, point));
     }
 
     private void ImageHost_SizeChanged(object? sender, SizeChangedEventArgs e)
@@ -754,9 +782,11 @@ public sealed partial class MainWindow
             : scaleReady ? "✓ 比例尺" : "1  标定比例尺";
         if (_editingPointIndex is int editing)
         {
-            PointStateText.Text = $"● 正在调整 P{editing + 1}";
+            PointStateText.Text = $"● 正在调整 P{editing + 1} · {_calibrationZoom:F2}×";
             PointStateText.Foreground = ActiveStateBrush;
-            InteractionHint.Text = $"调整 P{editing + 1}：点击、拖动或方向键；按钮/Enter 确认";
+            InteractionHint.Text = editing == 0
+                ? "P1：滚轮缩放 · 右键拖图 · Shift 锁定方向"
+                : "P2：滚轮缩放 · 右键拖图 · Shift 对齐 P1 十字";
         }
         else
         {

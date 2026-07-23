@@ -210,7 +210,7 @@
                       </Grid>
                       <TextBlock x:Name="PointStateText" Text="● 请确认 P1 和 P2"
                                  Foreground="#D07A00" FontWeight="SemiBold" />
-                      <TextBlock Text="标尺支持端点调整、整线平移、Shift 锁定方向和滚轮缩放；选点可拖动或用方向键微调。"
+                      <TextBlock Text="标尺和选点均支持滚轮缩放、右键拖图；P1 可用 Shift 锁定移动方向，P2 可用 Shift 对齐 P1 十字。"
                                  TextWrapping="Wrap" Classes="muted" FontSize="11" />
                     </StackPanel>
                   </Border>

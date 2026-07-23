@@ -74,6 +74,7 @@ public sealed partial class MainWindow : Window
     private double _defaultScaleLength = 100;
     private int? _editingPointIndex;
     private PointD? _editingPoint;
+    private PointD? _pointDragAnchor;
     private bool _draggingPoint;
     private int _pointCount;
     private bool _starting;

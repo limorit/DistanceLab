@@ -30,13 +30,7 @@ public sealed class PlotControl : Control
         IBrush accent = new SolidColorBrush(Color.Parse("#1888E8"));
         Rect bounds = new(0, 0, Bounds.Width, Bounds.Height);
         context.DrawRectangle(panel, new Pen(border, 1), bounds, 9, 9);
-        if (Bounds.Width < 160 || Bounds.Height < 120) return;
-
-        const double left = 76, right = 15, top = 16, bottom = 42;
-        Rect plot = new(left, top, Math.Max(10, Bounds.Width - left - right), Math.Max(10, Bounds.Height - top - bottom));
-        Pen axis = new(muted, 1);
-        context.DrawLine(axis, plot.BottomLeft, plot.TopLeft);
-        context.DrawLine(axis, plot.BottomLeft, plot.BottomRight);
+        if (Bounds.Width < 120 || Bounds.Height < 80) return;
 
         List<Point> pairs = [];
         foreach (PlotRecord record in _records)
@@ -45,12 +39,29 @@ public sealed class PlotControl : Control
                 double.IsFinite(x) && double.IsFinite(y))
                 pairs.Add(new Point(x, y));
 
-        DrawText(context, _xField, new Point(plot.Center.X, Bounds.Height - 16), muted, 10, TextAlignment.Center);
         if (pairs.Count == 0)
         {
-            DrawText(context, "等待有效数据…", plot.Center, muted, 12, TextAlignment.Center);
+            DrawText(context, "等待有效数据…", bounds.Center, muted, 12, TextAlignment.Center);
             return;
         }
+
+        double minX = pairs.Min(point => point.X), maxX = pairs.Max(point => point.X);
+        double minY = pairs.Min(point => point.Y), maxY = pairs.Max(point => point.Y);
+        ExpandRange(ref minX, ref maxX);
+        ExpandRange(ref minY, ref maxY, .05);
+        string[] yLabels = Enumerable.Range(0, 5)
+            .Select(tick => Format(minY + tick / 4d * (maxY - minY)))
+            .ToArray();
+        double left = Math.Clamp(
+            Math.Ceiling(yLabels.Max(label => MeasureTextWidth(label, muted, 9))) + 9,
+            42, 72);
+        const double right = 8, top = 9, bottom = 27;
+        Rect plot = new(left, top,
+            Math.Max(10, Bounds.Width - left - right),
+            Math.Max(10, Bounds.Height - top - bottom));
+        Pen axis = new(muted, 1);
+        context.DrawLine(axis, plot.BottomLeft, plot.TopLeft);
+        context.DrawLine(axis, plot.BottomLeft, plot.BottomRight);
 
         int maximum = Math.Max(100, (int)(plot.Width * 2));
         if (pairs.Count > maximum)
@@ -61,10 +72,6 @@ public sealed class PlotControl : Control
             pairs = reduced;
         }
 
-        double minX = pairs.Min(point => point.X), maxX = pairs.Max(point => point.X);
-        double minY = pairs.Min(point => point.Y), maxY = pairs.Max(point => point.Y);
-        ExpandRange(ref minX, ref maxX);
-        ExpandRange(ref minY, ref maxY, .05);
         Pen grid = new(border, 1);
         for (int tick = 0; tick < 5; tick++)
         {
@@ -72,8 +79,16 @@ public sealed class PlotControl : Control
             double px = plot.Left + fraction * plot.Width;
             double py = plot.Bottom - fraction * plot.Height;
             if (tick is > 0 and < 4) context.DrawLine(grid, new Point(plot.Left, py), new Point(plot.Right, py));
-            DrawText(context, Format(minX + fraction * (maxX - minX)), new Point(px, plot.Bottom + 13), muted, 9, TextAlignment.Center);
-            DrawText(context, Format(minY + fraction * (maxY - minY)), new Point(plot.Left - 7, py), muted, 9, TextAlignment.Right);
+            TextAlignment xAlignment = tick switch
+            {
+                0 => TextAlignment.Left,
+                4 => TextAlignment.Right,
+                _ => TextAlignment.Center
+            };
+            DrawText(context, Format(minX + fraction * (maxX - minX)),
+                new Point(px, plot.Bottom + 12), muted, 9, xAlignment);
+            DrawText(context, yLabels[tick], new Point(plot.Left - 7, py),
+                muted, 9, TextAlignment.Right);
         }
 
         Point Transform(Point point) => new(
@@ -113,10 +128,13 @@ public sealed class PlotControl : Control
         {
             TextAlignment.Center => new Point(anchor.X - layout.Width / 2, anchor.Y - layout.Height / 2),
             TextAlignment.Right => new Point(anchor.X - layout.Width, anchor.Y - layout.Height / 2),
-            _ => anchor
+            _ => new Point(anchor.X, anchor.Y - layout.Height / 2)
         };
         layout.Draw(context, origin);
     }
+
+    private static double MeasureTextWidth(string text, IBrush brush, double size) =>
+        new TextLayout(text, new Typeface("Inter"), size, brush).Width;
 
     private static string Format(double value) =>
         value.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
