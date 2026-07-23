@@ -136,12 +136,12 @@
       </Border>
 
       <Border Grid.Column="2" Classes="inspector-panel" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*">
           <Border Classes="inspector-header">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Spacing="2">
                 <TextBlock Text="检查器" Classes="inspector-title" />
-                <TextBlock Text="测量、追踪与数据设置" Classes="muted" FontSize="11" />
+                <TextBlock Text="前处理、追踪与数据设置" Classes="muted" FontSize="11" />
               </StackPanel>
               <Border Grid.Column="1" Background="#1F0A84FF" CornerRadius="10"
                       Padding="10,5" VerticalAlignment="Center">
@@ -151,8 +151,49 @@
             </Grid>
           </Border>
 
-          <TabControl Grid.Row="1" Classes="inspector-tabs">
-            <TabItem Header="测量">
+          <Border Grid.Row="1" Padding="18,13,18,14"
+                  BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                  BorderThickness="0,0,0,1">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="识别预览" Classes="section-title" />
+                  <TextBlock x:Name="RecognitionWindowSizeText"
+                             Text="OpenCV CLAHE 追踪输入 · 稳定窗口 61 × 61 px"
+                             Classes="muted" FontSize="11" />
+                </StackPanel>
+                <ComboBox x:Name="RecognitionScalingCombo" Grid.Column="1"
+                          Width="112" SelectedIndex="0"
+                          SelectionChanged="RecognitionScaling_Changed">
+                  <ComboBoxItem Content="像素放大" Tag="Pixel" />
+                  <ComboBoxItem Content="平滑放大" Tag="Smooth" />
+                </ComboBox>
+              </Grid>
+              <Grid ColumnDefinitions="*,12,*">
+                <StackPanel Spacing="5">
+                  <TextBlock Text="P1" FontWeight="SemiBold" />
+                  <Border Height="120" Background="#101114"
+                          CornerRadius="10" ClipToBounds="True">
+                    <Image x:Name="P1RecognitionImage" Stretch="Uniform" />
+                  </Border>
+                  <TextBlock x:Name="P1RecognitionStateText" Text="未选择"
+                             Classes="muted" FontSize="10.5" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Spacing="5">
+                  <TextBlock Text="P2" FontWeight="SemiBold" />
+                  <Border Height="120" Background="#101114"
+                          CornerRadius="10" ClipToBounds="True">
+                    <Image x:Name="P2RecognitionImage" Stretch="Uniform" />
+                  </Border>
+                  <TextBlock x:Name="P2RecognitionStateText" Text="未选择"
+                             Classes="muted" FontSize="10.5" TextWrapping="Wrap" />
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <TabControl Grid.Row="2" Classes="inspector-tabs">
+            <TabItem Header="前处理">
               <ScrollViewer VerticalScrollBarVisibility="Auto"
                             HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="18,16,18,20">
@@ -167,83 +208,6 @@
                                  Foreground="#D07A00" FontWeight="SemiBold" />
                       <TextBlock Text="标尺支持端点调整、整线平移、Shift 锁定方向和滚轮缩放；选点可拖动或用方向键微调。"
                                  TextWrapping="Wrap" Classes="muted" FontSize="11" />
-                    </StackPanel>
-                  </Border>
-
-                  <Border Classes="inspector-section last">
-                    <StackPanel Spacing="10">
-                      <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="2">
-                          <TextBlock Text="识别预览" Classes="section-title" />
-                          <TextBlock x:Name="RecognitionWindowSizeText"
-                                     Text="OpenCV CLAHE 追踪输入 · LK 41 × 41 px"
-                                     Classes="muted" FontSize="11" />
-                        </StackPanel>
-                        <ComboBox x:Name="RecognitionScalingCombo" Grid.Column="1"
-                                  Width="112" SelectedIndex="0"
-                                  SelectionChanged="RecognitionScaling_Changed">
-                          <ComboBoxItem Content="像素放大" Tag="Pixel" />
-                          <ComboBoxItem Content="平滑放大" Tag="Smooth" />
-                        </ComboBox>
-                      </Grid>
-                      <Grid ColumnDefinitions="*,12,*">
-                        <StackPanel Spacing="6">
-                          <TextBlock Text="P1" FontWeight="SemiBold" />
-                          <Border Height="164" Background="#101114"
-                                  CornerRadius="10" ClipToBounds="True">
-                            <Image x:Name="P1RecognitionImage" Stretch="Uniform" />
-                          </Border>
-                          <TextBlock x:Name="P1RecognitionStateText" Text="未选择"
-                                     Classes="muted" FontSize="11" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="6">
-                          <TextBlock Text="P2" FontWeight="SemiBold" />
-                          <Border Height="164" Background="#101114"
-                                  CornerRadius="10" ClipToBounds="True">
-                            <Image x:Name="P2RecognitionImage" Stretch="Uniform" />
-                          </Border>
-                          <TextBlock x:Name="P2RecognitionStateText" Text="未选择"
-                                     Classes="muted" FontSize="11" TextWrapping="Wrap" />
-                        </StackPanel>
-                      </Grid>
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
-              </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="追踪">
-              <ScrollViewer VerticalScrollBarVisibility="Auto"
-                            HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="18,16,18,20">
-                  <Border Classes="inspector-section">
-                    <StackPanel Spacing="11">
-                      <StackPanel Spacing="2">
-                        <TextBlock Text="追踪参数" Classes="section-title" />
-                        <TextBlock Text="连续光流、固定参考校正与丢失恢复"
-                                   Classes="muted" FontSize="11" />
-                      </StackPanel>
-                      <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto">
-                        <StackPanel Spacing="5">
-                          <TextBlock Text="LK 窗口 (px)" Classes="muted" />
-                          <TextBox x:Name="WindowSizeBox" Text="61"
-                                   TextChanged="TrackingSetting_Changed" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="5">
-                          <TextBlock Text="恢复半径 (px)" Classes="muted" />
-                          <TextBox x:Name="SearchRadiusBox" Text="80" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="2" Spacing="5">
-                          <TextBlock Text="固定参考阈值" Classes="muted" />
-                          <TextBox x:Name="ReferenceThresholdBox" Text="0.48" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="2" Grid.Column="2" Spacing="5">
-                          <TextBlock Text="前后向误差 (px)" Classes="muted" />
-                          <TextBox x:Name="FbThresholdBox" Text="1.50" />
-                        </StackPanel>
-                      </Grid>
-                      <CheckBox x:Name="PauseOnLossCheck"
-                                Content="低置信度时自动安全暂停" IsChecked="True" />
                     </StackPanel>
                   </Border>
 
@@ -317,6 +281,45 @@
               </ScrollViewer>
             </TabItem>
 
+            <TabItem Header="追踪">
+              <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="18,16,18,20">
+                  <Border Classes="inspector-section last">
+                    <StackPanel Spacing="11">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="追踪参数" Classes="section-title" />
+                        <TextBlock Text="连续光流、固定参考校正与丢失恢复"
+                                   Classes="muted" FontSize="11" />
+                      </StackPanel>
+                      <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="LK 窗口 (px)" Classes="muted" />
+                          <TextBox x:Name="WindowSizeBox" Text="61"
+                                   TextChanged="TrackingSetting_Changed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
+                          <TextBlock Text="恢复半径 (px)" Classes="muted" />
+                          <TextBox x:Name="SearchRadiusBox" Text="80" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Spacing="5">
+                          <TextBlock Text="固定参考阈值" Classes="muted" />
+                          <TextBox x:Name="ReferenceThresholdBox" Text="0.48" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="2" Spacing="5">
+                          <TextBlock Text="前后向误差 (px)" Classes="muted" />
+                          <TextBox x:Name="FbThresholdBox" Text="1.50" />
+                        </StackPanel>
+                      </Grid>
+                      <CheckBox x:Name="PauseOnLossCheck"
+                                Content="低置信度时自动安全暂停" IsChecked="True" />
+                    </StackPanel>
+                  </Border>
+
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
             <TabItem Header="数据">
               <Grid RowDefinitions="Auto,*" Margin="18,16,18,20">
                 <StackPanel Spacing="10">
@@ -341,7 +344,7 @@
                   </Grid>
                 </StackPanel>
                 <local:PlotControl x:Name="LivePlot" Grid.Row="1"
-                                   Margin="0,14,0,0" MinHeight="400" />
+                                   Margin="0,14,0,0" MinHeight="220" />
               </Grid>
             </TabItem>
           </TabControl>
