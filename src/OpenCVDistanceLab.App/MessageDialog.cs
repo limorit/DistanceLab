@@ -28,7 +28,7 @@ internal static class MessageDialog
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
-        App.ApplyPlatformWindowStyle(dialog);
+        App.ApplyUnifiedWindowStyle(dialog);
         TextBlock body = new() { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
         StackPanel buttons = new()
         {

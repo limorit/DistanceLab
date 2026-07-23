@@ -10,11 +10,18 @@ public sealed partial class App : Application
 {
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
-    internal static void ApplyPlatformWindowStyle(Window window)
+    internal static void ApplyUnifiedWindowStyle(Window window)
     {
-        if (!OperatingSystem.IsMacOS()) return;
-        window.Classes.Add("macos");
-        window.FontFamily = FontFamily.Default;
+        window.Classes.Add("unified");
+        if (OperatingSystem.IsMacOS())
+        {
+            window.Classes.Add("macos");
+            window.FontFamily = FontFamily.Default;
+        }
+        else if (OperatingSystem.IsWindows())
+        {
+            window.Classes.Add("windows");
+        }
     }
 
     private async void AppAboutMenu_Click(object? sender, EventArgs e)

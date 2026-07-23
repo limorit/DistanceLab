@@ -161,7 +161,7 @@ public sealed partial class MainWindow
 
     internal Task ShowAboutAsync() =>
         MessageDialog.Show(this, "关于 DistanceLab",
-            "DistanceLab 2.0.15\nAvalonia 跨平台界面 + C++20/OpenCV 原生追踪\n支持 Windows x64、macOS Apple Silicon 和 Intel。");
+            "DistanceLab 2.0.16\nAvalonia 跨平台统一界面 + C++20/OpenCV 原生追踪\n支持 Windows x64、macOS Apple Silicon 和 Intel。");
 
     private async void AboutMenu_Click(object? sender, RoutedEventArgs e) =>
         await ShowAboutAsync();

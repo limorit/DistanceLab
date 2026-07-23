@@ -14,7 +14,7 @@ public sealed partial class ScaleInputDialog : Window
     public ScaleInputDialog(double pixelLength, double defaultLength, string defaultUnit)
     {
         InitializeComponent();
-        App.ApplyPlatformWindowStyle(this);
+        App.ApplyUnifiedWindowStyle(this);
         PixelLengthText.Text = $"图中线段长度：{pixelLength:F3} px";
         LengthBox.Text = defaultLength.ToString("G", CultureInfo.InvariantCulture);
         UnitBox.Text = defaultUnit;

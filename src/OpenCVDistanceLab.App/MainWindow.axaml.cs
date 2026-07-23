@@ -98,7 +98,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        App.ApplyPlatformWindowStyle(this);
+        App.ApplyUnifiedWindowStyle(this);
         if (OperatingSystem.IsMacOS()) AppMenu.IsVisible = false;
         _preferences = AppPreferences.Load();
         DisplayMethodCombo.ItemsSource = _displayOptions;
