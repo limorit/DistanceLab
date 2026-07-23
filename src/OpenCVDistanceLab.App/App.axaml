@@ -8,10 +8,40 @@
       <NativeMenuItem Header="关于 OpenCV Distance Lab…" Click="AppAboutMenu_Click" />
     </NativeMenu>
   </NativeMenu.Menu>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppBackgroundBrush">#F5F5F7</SolidColorBrush>
+          <SolidColorBrush x:Key="AppSurfaceBrush">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="AppForegroundBrush">#1D1D1F</SolidColorBrush>
+          <SolidColorBrush x:Key="AppMutedForegroundBrush">#6E6E73</SolidColorBrush>
+          <SolidColorBrush x:Key="AppBorderBrush">#D1D1D6</SolidColorBrush>
+          <SolidColorBrush x:Key="AppControlBackgroundBrush">#F2F2F7</SolidColorBrush>
+          <SolidColorBrush x:Key="AppControlBorderBrush">#C7C7CC</SolidColorBrush>
+          <SolidColorBrush x:Key="AppDisabledBackgroundBrush">#E5E5EA</SolidColorBrush>
+          <SolidColorBrush x:Key="AppDisabledForegroundBrush">#8E8E93</SolidColorBrush>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppBackgroundBrush">#1C1C1E</SolidColorBrush>
+          <SolidColorBrush x:Key="AppSurfaceBrush">#2C2C2E</SolidColorBrush>
+          <SolidColorBrush x:Key="AppForegroundBrush">#F5F5F7</SolidColorBrush>
+          <SolidColorBrush x:Key="AppMutedForegroundBrush">#AEAEB2</SolidColorBrush>
+          <SolidColorBrush x:Key="AppBorderBrush">#48484A</SolidColorBrush>
+          <SolidColorBrush x:Key="AppControlBackgroundBrush">#3A3A3C</SolidColorBrush>
+          <SolidColorBrush x:Key="AppControlBorderBrush">#545458</SolidColorBrush>
+          <SolidColorBrush x:Key="AppDisabledBackgroundBrush">#2C2C2E</SolidColorBrush>
+          <SolidColorBrush x:Key="AppDisabledForegroundBrush">#8E8E93</SolidColorBrush>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme DensityStyle="Compact" />
     <Style Selector="Window">
       <Setter Property="FontFamily" Value="Inter, PingFang SC, Microsoft YaHei" />
+      <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Button.workflow">
       <Setter Property="MinWidth" Value="108" />
@@ -26,8 +56,8 @@
       <Setter Property="Foreground" Value="White" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="12" />
       <Setter Property="Padding" Value="15" />
@@ -38,7 +68,7 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="TextBlock.muted">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundLowBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedForegroundBrush}" />
     </Style>
     <Style Selector="TextBlock.eyebrow">
       <Setter Property="Foreground" Value="#0A84FF" />
@@ -51,30 +81,30 @@
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Border.top-toolbar">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="16,12" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="Border.workspace-stage">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
     </Style>
     <Style Selector="Border.stage-header">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="14,9" />
     </Style>
     <Style Selector="Border.inspector-panel">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
     </Style>
     <Style Selector="Border.inspector-header">
       <Setter Property="Padding" Value="18,15" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="Border.state-well">
@@ -86,7 +116,7 @@
       <Setter Property="Margin" Value="0,0,0,20" />
     </Style>
     <Style Selector="Border.inspector-section">
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
       <Setter Property="Padding" Value="0,0,0,20" />
       <Setter Property="Margin" Value="0,0,0,20" />
@@ -105,41 +135,49 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Border.status-bar">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="16,9" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
     </Style>
 
     <!-- macOS presentation layer. The class is added in code only on macOS so
          the existing Windows layout and control density remain unchanged. -->
     <Style Selector="Window.macos">
-      <Setter Property="Background" Value="{DynamicResource ThemeBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Window.macos Menu.app-menu">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
       <Setter Property="Padding" Value="10,3" />
     </Style>
     <Style Selector="Window.macos MenuItem">
       <Setter Property="Padding" Value="10,6,10,4" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Window.macos TextBlock">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="0,1,0,0" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
+    </Style>
+    <Style Selector="Window.macos TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource AppMutedForegroundBrush}" />
     </Style>
     <Style Selector="Window.macos Border.top-toolbar">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="16,12" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="Window.macos Border.workspace-stage">
       <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
     </Style>
     <Style Selector="Window.macos Border.stage-header">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="14,9" />
     </Style>
     <Style Selector="Window.macos Border.card">
@@ -153,9 +191,9 @@
       <Setter Property="BoxShadow" Value="0 2 8 0 #18000000" />
     </Style>
     <Style Selector="Window.macos Border.status-bar">
-      <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
       <Setter Property="Padding" Value="16,9" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
     </Style>
     <Style Selector="Window.macos Button">
@@ -163,6 +201,14 @@
       <Setter Property="Padding" Value="13,7,13,5" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
+    </Style>
+    <Style Selector="Window.macos Button:disabled">
+      <Setter Property="Foreground" Value="{DynamicResource AppDisabledForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppDisabledBackgroundBrush}" />
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Window.macos Button.workflow">
       <Setter Property="MinWidth" Value="104" />
@@ -185,28 +231,37 @@
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="7" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
-      <Setter Property="Background" Value="{DynamicResource ThemeControlLowBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
     </Style>
     <Style Selector="Window.macos TextBox:disabled">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundLowBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppDisabledForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppDisabledBackgroundBrush}" />
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Window.macos ComboBox">
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="7" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
-      <Setter Property="Background" Value="{DynamicResource ThemeControlLowBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppControlBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppControlBorderBrush}" />
     </Style>
     <Style Selector="Window.macos ComboBox:disabled">
-      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundLowBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource AppDisabledForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource AppDisabledBackgroundBrush}" />
       <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Window.macos ComboBoxItem">
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Window.macos CheckBox">
       <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
+    </Style>
+    <Style Selector="Window.macos TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource AppForegroundBrush}" />
     </Style>
     <Style Selector="Window.macos TextBlock.section-title">
       <Setter Property="FontSize" Value="15" />

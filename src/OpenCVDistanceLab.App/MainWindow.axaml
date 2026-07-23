@@ -96,7 +96,7 @@
       <Border Grid.Column="0" Classes="workspace-stage" ClipToBounds="True">
         <Grid RowDefinitions="52,*">
           <Border Classes="stage-header"
-                  BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                  BorderBrush="{DynamicResource AppBorderBrush}"
                   BorderThickness="0,0,0,1">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -152,7 +152,7 @@
           </Border>
 
           <Border Grid.Row="1" Padding="18,10"
-                  BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                  BorderBrush="{DynamicResource AppBorderBrush}"
                   BorderThickness="0,0,0,1">
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="*,Auto">
