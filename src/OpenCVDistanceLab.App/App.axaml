@@ -185,11 +185,25 @@
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="7" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeControlLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+    </Style>
+    <Style Selector="Window.macos TextBox:disabled">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundLowBrush}" />
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Window.macos ComboBox">
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="CornerRadius" Value="7" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeControlLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLowBrush}" />
+    </Style>
+    <Style Selector="Window.macos ComboBox:disabled">
+      <Setter Property="Foreground" Value="{DynamicResource ThemeForegroundLowBrush}" />
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Window.macos CheckBox">
       <Setter Property="VerticalContentAlignment" Value="Center" />
