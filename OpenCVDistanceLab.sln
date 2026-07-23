@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenCVDistanceLab.Core", "src\OpenCVDistanceLab.Core\OpenCVDistanceLab.Core.csproj", "{963BA07D-2DB2-4147-891A-4CD115635A34}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenCVDistanceLab.Interop", "src\OpenCVDistanceLab.Interop\OpenCVDistanceLab.Interop.csproj", "{F2EE195A-813F-4D98-B184-060122416120}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenCVDistanceLab.App", "src\OpenCVDistanceLab.App\OpenCVDistanceLab.App.csproj", "{1BEC4165-ADE0-4B31-B3ED-F33D29BDB709}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenCVDistanceLab.Core.Tests", "tests\OpenCVDistanceLab.Core.Tests\OpenCVDistanceLab.Core.Tests.csproj", "{C4A20EC1-1F1C-456E-923A-96F67BABDC75}"
+EndProject
+Global
+  GlobalSection(SolutionConfigurationPlatforms) = preSolution
+    Debug|Any CPU = Debug|Any CPU
+    Release|Any CPU = Release|Any CPU
+  EndGlobalSection
+  GlobalSection(ProjectConfigurationPlatforms) = postSolution
+    {963BA07D-2DB2-4147-891A-4CD115635A34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {963BA07D-2DB2-4147-891A-4CD115635A34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {963BA07D-2DB2-4147-891A-4CD115635A34}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {963BA07D-2DB2-4147-891A-4CD115635A34}.Release|Any CPU.Build.0 = Release|Any CPU
+    {F2EE195A-813F-4D98-B184-060122416120}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {F2EE195A-813F-4D98-B184-060122416120}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {F2EE195A-813F-4D98-B184-060122416120}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {F2EE195A-813F-4D98-B184-060122416120}.Release|Any CPU.Build.0 = Release|Any CPU
+    {1BEC4165-ADE0-4B31-B3ED-F33D29BDB709}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {1BEC4165-ADE0-4B31-B3ED-F33D29BDB709}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {1BEC4165-ADE0-4B31-B3ED-F33D29BDB709}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {1BEC4165-ADE0-4B31-B3ED-F33D29BDB709}.Release|Any CPU.Build.0 = Release|Any CPU
+    {C4A20EC1-1F1C-456E-923A-96F67BABDC75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+    {C4A20EC1-1F1C-456E-923A-96F67BABDC75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+    {C4A20EC1-1F1C-456E-923A-96F67BABDC75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+    {C4A20EC1-1F1C-456E-923A-96F67BABDC75}.Release|Any CPU.Build.0 = Release|Any CPU
+  EndGlobalSection
+EndGlobal

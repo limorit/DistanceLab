@@ -1,0 +1,39 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/native/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/artifacts/native/${presetName}",
+        "OpenCV_DIR": "$env{OpenCV_DIR}"
+      }
+    },
+    {
+      "name": "osx-arm64",
+      "inherits": "base",
+      "generator": "Unix Makefiles",
+      "cacheVariables": { "CMAKE_OSX_ARCHITECTURES": "arm64" }
+    },
+    {
+      "name": "osx-x64",
+      "inherits": "base",
+      "generator": "Unix Makefiles",
+      "cacheVariables": { "CMAKE_OSX_ARCHITECTURES": "x86_64" }
+    },
+    {
+      "name": "win-x64",
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64"
+    }
+  ],
+  "buildPresets": [
+    { "name": "osx-arm64", "configurePreset": "osx-arm64", "configuration": "Release" },
+    { "name": "osx-x64", "configurePreset": "osx-x64", "configuration": "Release" },
+    { "name": "win-x64", "configurePreset": "win-x64", "configuration": "Release" }
+  ]
+}

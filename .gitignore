@@ -1,0 +1,33 @@
+# Local tool and dependency directories
+.agents/
+.deps/
+.git/
+.venv/
+.vs/
+__pycache__/
+*.py[cod]
+
+# Build and publish outputs
+build/
+artifacts/
+**/bin/
+**/obj/
+*.zip
+*.pdb
+*.ilk
+
+# Experimental images and generated measurement data
+pic/
+*.SQLITE
+tracking_results*.csv
+tracking_results*_config.json
+tracking_error.log
+tracking_start_snapshots/
+
+# Local settings and temporary files
+*.ocvsettings.json
+*.tmp
+*.bak
+Thumbs.db
+Desktop.ini
+.DS_Store

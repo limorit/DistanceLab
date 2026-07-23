@@ -1,0 +1,368 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:OpenCVDistanceLab.App"
+        x:Class="OpenCVDistanceLab.App.MainWindow"
+        Title="OpenCV Distance Lab"
+        Width="1500" Height="940" MinWidth="1180" MinHeight="760"
+        Classes="main-window"
+        WindowStartupLocation="CenterScreen"
+        Loaded="MainWindow_Loaded" Closing="Window_Closing">
+  <NativeMenu.Menu>
+    <NativeMenu>
+      <NativeMenuItem Header="文件">
+        <NativeMenu>
+          <NativeMenuItem Header="选择工作目录…" Gesture="Meta+O"
+                          Click="NativeOpenFolderMenu_Click" />
+          <NativeMenuItem Header="读取 CSV…" Gesture="Meta+Shift+O"
+                          Click="NativeLoadCsvMenu_Click" />
+          <NativeMenuItemSeparator />
+          <NativeMenuItem Header="保存参数…" Gesture="Meta+S"
+                          Click="NativeSaveSettingsMenu_Click" />
+          <NativeMenuItem Header="读取参数…" Click="NativeLoadSettingsMenu_Click" />
+        </NativeMenu>
+      </NativeMenuItem>
+      <NativeMenuItem Header="外观">
+        <NativeMenu>
+          <NativeMenuItem Header="跟随系统" Click="NativeSystemThemeMenu_Click" />
+          <NativeMenuItem Header="浅色" Click="NativeLightThemeMenu_Click" />
+          <NativeMenuItem Header="深色" Click="NativeDarkThemeMenu_Click" />
+        </NativeMenu>
+      </NativeMenuItem>
+      <NativeMenuItem Header="帮助">
+        <NativeMenu>
+          <NativeMenuItem Header="运行原生自检" Click="NativeSelfTestMenu_Click" />
+        </NativeMenu>
+      </NativeMenuItem>
+    </NativeMenu>
+  </NativeMenu.Menu>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Menu x:Name="AppMenu" Grid.Row="0" Classes="app-menu">
+      <MenuItem Header="文件">
+        <MenuItem Header="选择工作目录…" Click="OpenFolderMenu_Click" />
+        <MenuItem Header="读取 CSV…" Click="LoadCsvMenu_Click" />
+        <Separator />
+        <MenuItem Header="保存参数…" Click="SaveSettingsMenu_Click" />
+        <MenuItem Header="读取参数…" Click="LoadSettingsMenu_Click" />
+        <Separator />
+        <MenuItem Header="退出" Click="ExitMenu_Click" />
+      </MenuItem>
+      <MenuItem Header="外观">
+        <MenuItem Header="跟随系统" Tag="System" Click="ThemeMenu_Click" />
+        <MenuItem Header="浅色" Tag="Light" Click="ThemeMenu_Click" />
+        <MenuItem Header="深色" Tag="Dark" Click="ThemeMenu_Click" />
+      </MenuItem>
+      <MenuItem Header="帮助">
+        <MenuItem Header="运行原生自检" Click="SelfTestMenu_Click" />
+        <MenuItem Header="关于" Click="AboutMenu_Click" />
+      </MenuItem>
+    </Menu>
+
+    <Border Grid.Row="1" Classes="top-toolbar">
+      <Grid ColumnDefinitions="280,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Image Width="50" Height="50"
+                 Source="avares://OpenCVDistanceLab/Assets/app-icon.png" />
+          <StackPanel VerticalAlignment="Center" Spacing="2">
+            <TextBlock Text="OpenCV Distance Lab" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock x:Name="WorkDirectoryText" Width="210"
+                       Text="尚未选择工作目录" TextTrimming="CharacterEllipsis"
+                       Classes="muted" FontSize="11" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+          <Button x:Name="CalibrateButton" Content="1  标定比例尺"
+                  Classes="workflow" Click="CalibrateButton_Click" />
+          <Button x:Name="Point1Button" Content="2  选择 P1"
+                  Classes="workflow" Click="Point1Button_Click" />
+          <Button x:Name="Point2Button" Content="选择 P2"
+                  Classes="workflow" Click="Point2Button_Click" />
+          <Button x:Name="StartButton" Content="3  开始追踪"
+                  Classes="workflow primary" Click="StartButton_Click" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                    VerticalAlignment="Center">
+          <Button x:Name="PauseButton" Content="暂停" Click="PauseButton_Click" />
+          <Button x:Name="StopButton" Content="停止" Click="StopButton_Click" />
+          <Button x:Name="ResetButton" Content="重置" Click="ResetButton_Click" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" Margin="16" ColumnDefinitions="*,16,410">
+      <Border Grid.Column="0" Classes="workspace-stage" ClipToBounds="True">
+        <Grid RowDefinitions="52,*">
+          <Border Classes="stage-header"
+                  BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                  BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Background="#1F0A84FF" CornerRadius="8" Padding="9,5">
+                  <TextBlock x:Name="StepBadge" Text="步骤 1 / 3 · 标定比例尺"
+                             Foreground="#0A84FF" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock x:Name="InteractionHint" Text="请选择工作目录"
+                           Classes="muted" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="18"
+                          VerticalAlignment="Center">
+                <TextBlock x:Name="DistanceText" Text="实际距离：—"
+                           FontSize="14" FontWeight="SemiBold" />
+                <TextBlock x:Name="PixelDistanceText" Text="像素距离：—" Classes="muted" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Grid x:Name="ImageHost" Grid.Row="1" Background="#101114"
+                ClipToBounds="True" Focusable="True"
+                PointerPressed="ImageHost_PointerPressed"
+                PointerMoved="ImageHost_PointerMoved"
+                PointerReleased="ImageHost_PointerReleased"
+                PointerWheelChanged="ImageHost_PointerWheelChanged"
+                SizeChanged="ImageHost_SizeChanged">
+            <Image x:Name="PreviewImage" Stretch="Uniform" />
+            <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False" />
+            <Border x:Name="PreviewBusy" IsVisible="False" Background="#88000000">
+              <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <ProgressBar IsIndeterminate="True" Width="190" />
+                <TextBlock Text="OpenCV 正在处理当前帧…" Foreground="White" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="2" Classes="inspector-panel" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <Border Classes="inspector-header">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="检查器" Classes="inspector-title" />
+                <TextBlock Text="测量、追踪与数据设置" Classes="muted" FontSize="11" />
+              </StackPanel>
+              <Border Grid.Column="1" Background="#1F0A84FF" CornerRadius="10"
+                      Padding="10,5" VerticalAlignment="Center">
+                <TextBlock Text="OpenCV" Foreground="#0A84FF"
+                           FontSize="11" FontWeight="SemiBold" />
+              </Border>
+            </Grid>
+          </Border>
+
+          <TabControl Grid.Row="1" Classes="inspector-tabs">
+            <TabItem Header="测量">
+              <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="18,16,18,20">
+                  <Border Classes="state-well">
+                    <StackPanel Spacing="7">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="当前状态" Classes="section-title" />
+                        <TextBlock x:Name="ScaleStateText" Grid.Column="1"
+                                   Text="● 比例尺未设置" Foreground="#D07A00" />
+                      </Grid>
+                      <TextBlock x:Name="PointStateText" Text="● 请确认 P1 和 P2"
+                                 Foreground="#D07A00" FontWeight="SemiBold" />
+                      <TextBlock Text="标尺支持端点调整、整线平移、Shift 锁定方向和滚轮缩放；选点可拖动或用方向键微调。"
+                                 TextWrapping="Wrap" Classes="muted" FontSize="11" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="inspector-section last">
+                    <StackPanel Spacing="10">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="识别预览" Classes="section-title" />
+                          <TextBlock x:Name="RecognitionWindowSizeText"
+                                     Text="OpenCV CLAHE 追踪输入 · LK 41 × 41 px"
+                                     Classes="muted" FontSize="11" />
+                        </StackPanel>
+                        <ComboBox x:Name="RecognitionScalingCombo" Grid.Column="1"
+                                  Width="112" SelectedIndex="0"
+                                  SelectionChanged="RecognitionScaling_Changed">
+                          <ComboBoxItem Content="像素放大" Tag="Pixel" />
+                          <ComboBoxItem Content="平滑放大" Tag="Smooth" />
+                        </ComboBox>
+                      </Grid>
+                      <Grid ColumnDefinitions="*,12,*">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="P1" FontWeight="SemiBold" />
+                          <Border Height="164" Background="#101114"
+                                  CornerRadius="10" ClipToBounds="True">
+                            <Image x:Name="P1RecognitionImage" Stretch="Uniform" />
+                          </Border>
+                          <TextBlock x:Name="P1RecognitionStateText" Text="未选择"
+                                     Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="6">
+                          <TextBlock Text="P2" FontWeight="SemiBold" />
+                          <Border Height="164" Background="#101114"
+                                  CornerRadius="10" ClipToBounds="True">
+                            <Image x:Name="P2RecognitionImage" Stretch="Uniform" />
+                          </Border>
+                          <TextBlock x:Name="P2RecognitionStateText" Text="未选择"
+                                     Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="追踪">
+              <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="18,16,18,20">
+                  <Border Classes="inspector-section">
+                    <StackPanel Spacing="11">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="追踪参数" Classes="section-title" />
+                        <TextBlock Text="Lucas–Kanade 光流与丢失恢复设置"
+                                   Classes="muted" FontSize="11" />
+                      </StackPanel>
+                      <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto">
+                        <StackPanel Spacing="5">
+                          <TextBlock Text="LK 窗口 (px)" Classes="muted" />
+                          <TextBox x:Name="WindowSizeBox" Text="41"
+                                   TextChanged="TrackingSetting_Changed" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="5">
+                          <TextBlock Text="恢复半径 (px)" Classes="muted" />
+                          <TextBox x:Name="SearchRadiusBox" Text="80" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Spacing="5">
+                          <TextBlock Text="固定参考阈值" Classes="muted" />
+                          <TextBox x:Name="ReferenceThresholdBox" Text="0.48" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="2" Spacing="5">
+                          <TextBlock Text="前后向误差 (px)" Classes="muted" />
+                          <TextBox x:Name="FbThresholdBox" Text="1.50" />
+                        </StackPanel>
+                      </Grid>
+                      <CheckBox x:Name="PauseOnLossCheck"
+                                Content="低置信度时自动安全暂停" IsChecked="True" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="inspector-section">
+                    <StackPanel Spacing="9">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="图像显示" Classes="section-title" />
+                        <TextBlock Text="只改变预览，不影响原始测量数据"
+                                   Classes="muted" FontSize="11" />
+                      </StackPanel>
+                      <ComboBox x:Name="DisplayMethodCombo"
+                                SelectionChanged="DisplaySetting_Changed" />
+                      <TextBlock x:Name="AlgorithmDescription" Classes="muted"
+                                 TextWrapping="Wrap" FontSize="11" />
+                      <Grid x:Name="ContrastParameterRow" ColumnDefinitions="102,*,48">
+                        <TextBlock Text="对比度裁剪" Classes="muted" VerticalAlignment="Center" />
+                        <Slider x:Name="ContrastSlider" Grid.Column="1" Minimum="0"
+                                Maximum="10" Value="1" ValueChanged="DisplaySetting_Changed" />
+                        <TextBlock x:Name="ContrastValue" Grid.Column="2"
+                                   Text="1.0%" TextAlignment="Right" />
+                      </Grid>
+                      <Grid x:Name="GammaParameterRow" ColumnDefinitions="102,*,48">
+                        <TextBlock Text="Gamma" Classes="muted" VerticalAlignment="Center" />
+                        <Slider x:Name="GammaSlider" Grid.Column="1" Minimum="0.1"
+                                Maximum="3" Value="0.75" ValueChanged="DisplaySetting_Changed" />
+                        <TextBlock x:Name="GammaValue" Grid.Column="2"
+                                   Text="0.75" TextAlignment="Right" />
+                      </Grid>
+                      <Grid x:Name="DenoiseParameterRow" ColumnDefinitions="102,*,48">
+                        <TextBlock Text="NLM 强度" Classes="muted" VerticalAlignment="Center" />
+                        <Slider x:Name="DenoiseSlider" Grid.Column="1" Minimum="0"
+                                Maximum="25" Value="5" ValueChanged="DisplaySetting_Changed" />
+                        <TextBlock x:Name="DenoiseValue" Grid.Column="2"
+                                   Text="5.0" TextAlignment="Right" />
+                      </Grid>
+                      <Grid x:Name="RetinexParameterRow" ColumnDefinitions="102,*,48">
+                        <TextBlock Text="Retinex σ" Classes="muted" VerticalAlignment="Center" />
+                        <Slider x:Name="RetinexSlider" Grid.Column="1" Minimum="5"
+                                Maximum="200" Value="80" ValueChanged="DisplaySetting_Changed" />
+                        <TextBlock x:Name="RetinexValue" Grid.Column="2"
+                                   Text="80" TextAlignment="Right" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="inspector-section last">
+                    <StackPanel Spacing="10">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="标记样式" Classes="section-title" />
+                        <TextBlock Text="调整画布上选点与辅助线的视觉效果"
+                                   Classes="muted" FontSize="11" />
+                      </StackPanel>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="十字尺寸" Classes="muted" />
+                        <Slider x:Name="MarkerSizeSlider" Minimum="7" Maximum="30"
+                                Value="12" ValueChanged="OverlaySetting_Changed" />
+                      </StackPanel>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="标记线宽" Classes="muted" />
+                        <Slider x:Name="MarkerWidthSlider" Minimum="0.6" Maximum="3"
+                                Value="1.2" ValueChanged="OverlaySetting_Changed" />
+                      </StackPanel>
+                      <StackPanel Spacing="4">
+                        <TextBlock Text="辅助层不透明度" Classes="muted" />
+                        <Slider x:Name="OpacitySlider" Minimum="0.15" Maximum="0.9"
+                                Value="0.55" ValueChanged="OverlaySetting_Changed" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="数据">
+              <Grid RowDefinitions="Auto,*" Margin="18,16,18,20">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="数据曲线" Classes="section-title" />
+                      <TextBlock x:Name="PlotSourceText"
+                                 Text="数据源：实时追踪（0 条）"
+                                 Classes="muted" FontSize="11" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="实时数据"
+                            Click="ShowLiveButton_Click" />
+                  </Grid>
+                  <Grid ColumnDefinitions="18,*,30,*">
+                    <TextBlock Text="X" VerticalAlignment="Center" />
+                    <ComboBox x:Name="XFieldCombo" Grid.Column="1"
+                              SelectionChanged="PlotField_Changed" />
+                    <TextBlock Grid.Column="2" Text="Y" VerticalAlignment="Center"
+                               HorizontalAlignment="Center" />
+                    <ComboBox x:Name="YFieldCombo" Grid.Column="3"
+                              SelectionChanged="PlotField_Changed" />
+                  </Grid>
+                </StackPanel>
+                <local:PlotControl x:Name="LivePlot" Grid.Row="1"
+                                   Margin="0,14,0,0" MinHeight="400" />
+              </Grid>
+            </TabItem>
+          </TabControl>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="3" Classes="status-bar">
+      <Grid ColumnDefinitions="*,150,390,116" VerticalAlignment="Center">
+        <TextBlock x:Name="StatusText" Text="请选择工作目录"
+                   Classes="muted" TextTrimming="CharacterEllipsis" />
+        <TextBlock x:Name="FrameText" Grid.Column="1" Text="帧 — / —"
+                   Classes="muted" Margin="16,1,16,0"
+                   TextAlignment="Right" TextWrapping="NoWrap" />
+        <ProgressBar x:Name="TrackingProgress" Grid.Column="2"
+                     Minimum="0" Maximum="1" Value="0"
+                     VerticalAlignment="Center" />
+        <TextBlock x:Name="ProgressText" Grid.Column="3" Text="0%"
+                   Classes="muted" Margin="12,1,0,0"
+                   TextAlignment="Right" TextWrapping="NoWrap" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

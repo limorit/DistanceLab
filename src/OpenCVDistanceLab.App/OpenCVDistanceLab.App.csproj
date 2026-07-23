@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>OpenCVDistanceLab</AssemblyName>
+    <RootNamespace>OpenCVDistanceLab.App</RootNamespace>
+    <Version>2.0.4</Version>
+    <RuntimeIdentifiers>win-x64;osx-arm64;osx-x64</RuntimeIdentifiers>
+    <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">Assets/app-icon.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <ProjectReference Include="../OpenCVDistanceLab.Core/OpenCVDistanceLab.Core.csproj" />
+    <ProjectReference Include="../OpenCVDistanceLab.Interop/OpenCVDistanceLab.Interop.csproj" />
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <Content Include="../../artifacts/native/win-x64/distance_tracker_native.dll"
+             Condition="Exists('../../artifacts/native/win-x64/distance_tracker_native.dll')"
+             Link="distance_tracker_native.dll" CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">
+    <Content Include="../../artifacts/native/osx-arm64/libdistance_tracker_native.dylib"
+             Condition="Exists('../../artifacts/native/osx-arm64/libdistance_tracker_native.dylib')"
+             Link="libdistance_tracker_native.dylib" CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+    <Content Include="../../artifacts/native/osx-x64/libdistance_tracker_native.dylib"
+             Condition="Exists('../../artifacts/native/osx-x64/libdistance_tracker_native.dylib')"
+             Link="libdistance_tracker_native.dylib" CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
