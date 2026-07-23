@@ -274,6 +274,8 @@ public:
         previousGray_ = preprocess(previousBgr_);
         points_[0] = cv::Point2f(static_cast<float>(points[0].x), static_cast<float>(points[0].y));
         points_[1] = cv::Point2f(static_cast<float>(points[1].x), static_cast<float>(points[1].y));
+        referenceGray_ = previousGray_.clone();
+        referencePoints_ = points_;
         updateSettings(settings);
         rebuildTemplates();
     }
@@ -328,63 +330,146 @@ public:
             backwardStatus, backwardError, cv::Size(settings_.windowSize, settings_.windowSize),
             4, cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
             cv::OPTFLOW_USE_INITIAL_FLOW, 1.0e-5);
+        const std::vector<cv::Point2f> referencePoints{
+            referencePoints_[0], referencePoints_[1]};
+        std::vector<cv::Point2f> referenceForward = predicted;
+        std::vector<unsigned char> referenceForwardStatus;
+        std::vector<float> referenceForwardError;
+        cv::calcOpticalFlowPyrLK(
+            referenceGray_, currentGray_, referencePoints, referenceForward,
+            referenceForwardStatus, referenceForwardError,
+            cv::Size(settings_.windowSize, settings_.windowSize), 4,
+            cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
+            cv::OPTFLOW_USE_INITIAL_FLOW, 1.0e-5);
+        std::vector<cv::Point2f> referenceBackward = referencePoints;
+        std::vector<unsigned char> referenceBackwardStatus;
+        std::vector<float> referenceBackwardError;
+        cv::calcOpticalFlowPyrLK(
+            currentGray_, referenceGray_, referenceForward, referenceBackward,
+            referenceBackwardStatus, referenceBackwardError,
+            cv::Size(settings_.windowSize, settings_.windowSize), 4,
+            cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
+            cv::OPTFLOW_USE_INITIAL_FLOW, 1.0e-5);
 
         struct PointOutcome {
             cv::Point2f candidate{};
             double quality = -1.0;
             int status = DT_LOST;
             bool valid = false;
+            bool continuous = false;
             bool replaceKeyframe = false;
             cv::Mat replacementKeyframe;
         };
         std::array<PointOutcome, 2> outcomes{};
         cv::parallel_for_(cv::Range(0, 2), [&](const cv::Range& range) {
             for (int i = range.start; i < range.end; ++i) {
-            PointOutcome outcome;
-            outcome.candidate = forward[i];
-            outcome.quality = patchCorrelation(
-                patchAt(previousGray_, points_[i], templateSize_),
-                patchAt(currentGray_, outcome.candidate, templateSize_));
-            outcome.valid = i < static_cast<int>(forwardStatus.size()) && forwardStatus[i] &&
-                i < static_cast<int>(backwardStatus.size()) && backwardStatus[i] &&
-                cv::norm(backward[i] - points_[i]) <= settings_.forwardBackwardThreshold &&
-                outcome.quality >= 0.30 && inside(currentGray_, outcome.candidate, templateSize_ / 2 + 2);
-            outcome.status = outcome.valid ? DT_LK : DT_LOST;
-            if (!outcome.valid) {
-                const Match local = matchTemplate(
-                    patchAt(previousGray_, points_[i], templateSize_), currentGray_,
-                    predicted[i], settings_.searchRadius);
-                if (local.valid && local.score >= 0.45 && local.psr >= 4.0) {
-                    outcome.candidate = local.point; outcome.quality = local.score;
-                    outcome.valid = true; outcome.status = DT_TEMPLATE;
-                } else {
-                    outcome.candidate = predicted[i]; outcome.quality = -1.0;
+                PointOutcome outcome;
+                outcome.candidate = forward[i];
+                outcome.quality = patchCorrelation(
+                    patchAt(previousGray_, points_[i], templateSize_),
+                    patchAt(currentGray_, outcome.candidate, templateSize_));
+                outcome.valid = i < static_cast<int>(forwardStatus.size()) && forwardStatus[i] &&
+                    i < static_cast<int>(backwardStatus.size()) && backwardStatus[i] &&
+                    cv::norm(backward[i] - points_[i]) <= settings_.forwardBackwardThreshold &&
+                    outcome.quality >= 0.30 &&
+                    inside(currentGray_, outcome.candidate, templateSize_ / 2 + 2);
+                outcome.continuous = outcome.valid;
+                outcome.status = outcome.valid ? DT_LK : DT_LOST;
+                const double referenceQuality = patchCorrelation(
+                    patchAt(referenceGray_, referencePoints_[i], templateSize_),
+                    patchAt(currentGray_, referenceForward[i], templateSize_));
+                const bool referenceValid =
+                    i < static_cast<int>(referenceForwardStatus.size()) &&
+                    referenceForwardStatus[i] &&
+                    i < static_cast<int>(referenceBackwardStatus.size()) &&
+                    referenceBackwardStatus[i] &&
+                    cv::norm(referenceBackward[i] - referencePoints_[i]) <=
+                        settings_.forwardBackwardThreshold &&
+                    referenceQuality >= 0.30 &&
+                    inside(currentGray_, referenceForward[i], templateSize_ / 2 + 2);
+                if (referenceValid) {
+                    if (!outcome.valid) {
+                        outcome.candidate = referenceForward[i];
+                        outcome.quality = referenceQuality;
+                        outcome.valid = true;
+                        outcome.status = DT_REFERENCE;
+                    } else if (cv::norm(referenceForward[i] - outcome.candidate) <=
+                               std::max(0.75, settings_.forwardBackwardThreshold)) {
+                        constexpr float referenceWeight = 0.65f;
+                        outcome.candidate =
+                            referenceForward[i] * referenceWeight +
+                            outcome.candidate * (1.0f - referenceWeight);
+                        outcome.quality =
+                            referenceQuality * referenceWeight +
+                            outcome.quality * (1.0 - referenceWeight);
+                        outcome.status = DT_REFERENCE;
+                    }
                 }
-            }
-            const Match anchored = matchTemplate(
-                referenceTemplates_[i], currentGray_, outcome.candidate, settings_.searchRadius);
-            if (anchored.valid && anchored.score >= settings_.referenceThreshold && anchored.psr >= 4.5) {
-                outcome.candidate = anchored.point; outcome.quality = anchored.score;
-                outcome.valid = true; outcome.status = DT_REFERENCE;
-                outcome.replaceKeyframe = true;
-                outcome.replacementKeyframe = patchAt(currentGray_, outcome.candidate, referenceSize_);
-            } else {
-                const Match keyframed = matchTemplate(
-                    keyframeTemplates_[i], currentGray_, outcome.candidate, settings_.searchRadius);
-                if (keyframed.valid &&
-                    keyframed.score >= std::max(0.40, settings_.referenceThreshold - 0.08) &&
-                    keyframed.psr >= 4.2) {
-                    outcome.candidate = keyframed.point; outcome.quality = keyframed.score;
-                    outcome.valid = true; outcome.status = DT_KEYFRAME;
+                if (!outcome.valid) {
+                    const int localRadius = std::min(
+                        settings_.searchRadius, std::max(12, settings_.windowSize / 2));
+                    const Match local = matchTemplate(
+                        patchAt(previousGray_, points_[i], templateSize_), currentGray_,
+                        predicted[i], localRadius);
+                    if (local.valid && local.score >= 0.45 && local.psr >= 4.0) {
+                        outcome.candidate = local.point;
+                        outcome.quality = local.score;
+                        outcome.valid = true;
+                        outcome.status = DT_TEMPLATE;
+                    } else {
+                        outcome.candidate = predicted[i];
+                        outcome.quality = -1.0;
+                    }
                 }
-            }
-            outcomes[i] = std::move(outcome);
+                if (!outcome.valid) {
+                    const Match anchored = matchTemplate(
+                        referenceTemplates_[i], currentGray_, predicted[i],
+                        settings_.searchRadius);
+                    if (anchored.valid &&
+                        anchored.score >= settings_.referenceThreshold && anchored.psr >= 4.5) {
+                        outcome.candidate = anchored.point;
+                        outcome.quality = anchored.score;
+                        outcome.valid = true;
+                        outcome.status = DT_REFERENCE;
+                        outcome.replaceKeyframe = true;
+                        outcome.replacementKeyframe =
+                            patchAt(currentGray_, outcome.candidate, referenceSize_);
+                    }
+                }
+                if (!outcome.valid) {
+                    const Match keyframed = matchTemplate(
+                        keyframeTemplates_[i], currentGray_, predicted[i],
+                        settings_.searchRadius);
+                    if (keyframed.valid &&
+                        keyframed.score >=
+                            std::max(0.40, settings_.referenceThreshold - 0.08) &&
+                        keyframed.psr >= 4.2) {
+                        outcome.candidate = keyframed.point;
+                        outcome.quality = keyframed.score;
+                        outcome.valid = true;
+                        outcome.status = DT_KEYFRAME;
+                    }
+                }
+                outcomes[i] = std::move(outcome);
             }
         }, 2.0);
+        std::array<cv::Point2f, 2> nextVelocities{};
         for (int i = 0; i < 2; ++i) {
             const PointOutcome& outcome = outcomes[i];
-            newPoints_[i] = outcome.candidate;
-            output.points[i] = {outcome.candidate.x, outcome.candidate.y};
+            cv::Point2f accepted = outcome.candidate;
+            if (outcome.valid && outcome.continuous) {
+                constexpr float positionGain = 0.58f;
+                constexpr float velocityGain = 0.06f;
+                const cv::Point2f innovation = outcome.candidate - predicted[i];
+                accepted = predicted[i] + positionGain * innovation;
+                nextVelocities[i] = velocities_[i] + velocityGain * innovation;
+            } else if (outcome.valid) {
+                nextVelocities[i] = outcome.candidate - points_[i];
+            } else {
+                nextVelocities[i] = velocities_[i] * 0.5f;
+            }
+            newPoints_[i] = accepted;
+            output.points[i] = {accepted.x, accepted.y};
             output.qualities[i] = outcome.quality;
             output.statuses[i] = outcome.status;
             output.valid[i] = outcome.valid ? 1 : 0;
@@ -392,7 +477,7 @@ public:
                 keyframeTemplates_[i] = outcome.replacementKeyframe;
         }
         for (int i = 0; i < 2; ++i) {
-            velocities_[i] = output.valid[i] ? newPoints_[i] - points_[i] : velocities_[i] * 0.5f;
+            velocities_[i] = nextVelocities[i];
             points_[i] = newPoints_[i];
         }
         previousBgr_ = currentBgr_;
@@ -406,9 +491,10 @@ public:
         cv::Mat patch = patchAt(previousGray_, selected, referenceSize_);
         if (patch.empty()) return false;
         points_[index] = selected;
-        velocities_[index] = {};
-        referenceTemplates_[index] = patch.clone();
-        keyframeTemplates_[index] = patch.clone();
+        velocities_[0] = velocities_[1] = {};
+        referenceGray_ = previousGray_.clone();
+        referencePoints_ = points_;
+        rebuildTemplates();
         return true;
     }
 
@@ -420,8 +506,9 @@ private:
     DtTrackerSettings settings_{};
     int templateSize_ = 41;
     int referenceSize_ = 41;
-    cv::Mat previousBgr_, previousGray_, currentBgr_, currentGray_;
+    cv::Mat previousBgr_, previousGray_, currentBgr_, currentGray_, referenceGray_;
     std::array<cv::Point2f, 2> points_{};
+    std::array<cv::Point2f, 2> referencePoints_{};
     std::array<cv::Point2f, 2> newPoints_{};
     std::array<cv::Point2f, 2> velocities_{};
     std::array<cv::Mat, 2> referenceTemplates_{};

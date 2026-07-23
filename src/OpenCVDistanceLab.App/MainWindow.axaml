@@ -220,13 +220,13 @@
                     <StackPanel Spacing="11">
                       <StackPanel Spacing="2">
                         <TextBlock Text="追踪参数" Classes="section-title" />
-                        <TextBlock Text="Lucas–Kanade 光流与丢失恢复设置"
+                        <TextBlock Text="连续光流、固定参考校正与丢失恢复"
                                    Classes="muted" FontSize="11" />
                       </StackPanel>
                       <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,12,Auto">
                         <StackPanel Spacing="5">
                           <TextBlock Text="LK 窗口 (px)" Classes="muted" />
-                          <TextBox x:Name="WindowSizeBox" Text="41"
+                          <TextBox x:Name="WindowSizeBox" Text="61"
                                    TextChanged="TrackingSetting_Changed" />
                         </StackPanel>
                         <StackPanel Grid.Column="2" Spacing="5">

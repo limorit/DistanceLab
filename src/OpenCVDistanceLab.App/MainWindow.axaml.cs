@@ -271,7 +271,7 @@ public sealed partial class MainWindow : Window
         ContrastSlider.Value, GammaSlider.Value, DenoiseSlider.Value, RetinexSlider.Value);
 
     private TrackingSettings ReadTrackingSettings() => new TrackingSettings(
-        ParseInt(WindowSizeBox.Text, 41, 15),
+        ParseInt(WindowSizeBox.Text, 61, 15),
         ParseInt(SearchRadiusBox.Text, 80, 10),
         ParseDouble(ReferenceThresholdBox.Text, .48),
         ParseDouble(FbThresholdBox.Text, 1.5),
@@ -309,7 +309,10 @@ public sealed partial class MainWindow : Window
     {
         bool ready = _uiReady;
         _uiReady = false;
-        settings.SchemaVersion = 3;
+        int windowSize = settings.SchemaVersion < 4 && settings.WindowSize == 41
+            ? 61
+            : settings.WindowSize;
+        settings.SchemaVersion = 4;
         _preferences.Settings.Theme = settings.Theme is "Light" or "Dark" ? settings.Theme : "System";
         ApplyTheme(_preferences.Settings.Theme);
         DisplayMethodCombo.SelectedItem = _displayOptions.First(option => option.Method == settings.DisplayMethod);
@@ -320,7 +323,7 @@ public sealed partial class MainWindow : Window
         MarkerSizeSlider.Value = Math.Clamp(settings.MarkerSize, 7, 30);
         MarkerWidthSlider.Value = Math.Clamp(settings.MarkerWidth, .6, 3);
         OpacitySlider.Value = Math.Clamp(settings.MarkerOpacity, .15, .9);
-        WindowSizeBox.Text = settings.WindowSize.ToString(CultureInfo.InvariantCulture);
+        WindowSizeBox.Text = windowSize.ToString(CultureInfo.InvariantCulture);
         SearchRadiusBox.Text = settings.SearchRadius.ToString(CultureInfo.InvariantCulture);
         ReferenceThresholdBox.Text = settings.ReferenceThreshold.ToString("G", CultureInfo.InvariantCulture);
         FbThresholdBox.Text = settings.ForwardBackwardThreshold.ToString("G", CultureInfo.InvariantCulture);

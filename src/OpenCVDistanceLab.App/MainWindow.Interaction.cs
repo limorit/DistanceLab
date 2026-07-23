@@ -596,7 +596,8 @@ public sealed partial class MainWindow
 
     private void RefreshRecognitionWindows()
     {
-        RecognitionWindowSizeText.Text = $"OpenCV CLAHE 追踪输入 · LK {ReadTrackingSettings().WindowSize} × {ReadTrackingSettings().WindowSize} px";
+        RecognitionWindowSizeText.Text =
+            $"OpenCV CLAHE 追踪输入 · 稳定窗口 {ReadTrackingSettings().WindowSize} × {ReadTrackingSettings().WindowSize} px";
         ReplaceRecognitionBitmap(0, CreateRecognitionPatch(GetDisplayedPoint(0), ReadTrackingSettings().WindowSize));
         ReplaceRecognitionBitmap(1, CreateRecognitionPatch(GetDisplayedPoint(1), ReadTrackingSettings().WindowSize));
         UpdateRecognitionText(0, P1RecognitionStateText);
@@ -615,14 +616,32 @@ public sealed partial class MainWindow
         int half = size / 2;
         for (int y = 0; y < size; y++)
         {
-            int sourceY = Math.Clamp((int)Math.Round(point.Value.Y) + y - half, 0, _pixelFrame.Height - 1);
             for (int x = 0; x < size; x++)
             {
-                int sourceX = Math.Clamp((int)Math.Round(point.Value.X) + x - half, 0, _pixelFrame.Width - 1);
-                patch[y * size + x] = _pixelFrame.TrackingGray[sourceY * _pixelFrame.TrackingStride + sourceX];
+                double sourceX = point.Value.X + x - half;
+                double sourceY = point.Value.Y + y - half;
+                patch[y * size + x] = SampleTrackingGray(sourceX, sourceY);
             }
         }
         return CreateBitmap(patch, size, size, size, PixelFormats.Gray8, AlphaFormat.Opaque);
+    }
+
+    private byte SampleTrackingGray(double x, double y)
+    {
+        PixelFrame frame = _pixelFrame!;
+        x = Math.Clamp(x, 0, frame.Width - 1d);
+        y = Math.Clamp(y, 0, frame.Height - 1d);
+        int x0 = (int)Math.Floor(x), y0 = (int)Math.Floor(y);
+        int x1 = Math.Min(x0 + 1, frame.Width - 1);
+        int y1 = Math.Min(y0 + 1, frame.Height - 1);
+        double fx = x - x0, fy = y - y0;
+        int topLeft = frame.TrackingGray[y0 * frame.TrackingStride + x0];
+        int topRight = frame.TrackingGray[y0 * frame.TrackingStride + x1];
+        int bottomLeft = frame.TrackingGray[y1 * frame.TrackingStride + x0];
+        int bottomRight = frame.TrackingGray[y1 * frame.TrackingStride + x1];
+        double top = topLeft + (topRight - topLeft) * fx;
+        double bottom = bottomLeft + (bottomRight - bottomLeft) * fx;
+        return (byte)Math.Clamp(Math.Round(top + (bottom - top) * fy), 0, 255);
     }
 
     private void ReplaceRecognitionBitmap(int index, Bitmap? bitmap)

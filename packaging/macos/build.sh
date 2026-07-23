@@ -9,8 +9,10 @@ case "$rid" in
 esac
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if ! command -v cmake >/dev/null; then echo "CMake 3.24 or newer is required." >&2; exit 2; fi
-if ! command -v dotnet >/dev/null; then echo ".NET 10 SDK or newer is required." >&2; exit 2; fi
+cmake_command="${CMAKE_COMMAND:-cmake}"
+dotnet_command="${DOTNET_COMMAND:-dotnet}"
+if ! command -v "$cmake_command" >/dev/null; then echo "CMake 3.24 or newer is required." >&2; exit 2; fi
+if ! command -v "$dotnet_command" >/dev/null; then echo ".NET 10 SDK or newer is required." >&2; exit 2; fi
 if [[ -z "${OpenCV_DIR:-}" ]] && command -v brew >/dev/null; then
   OpenCV_DIR="$(brew --prefix opencv)/lib/cmake/opencv4"
   export OpenCV_DIR
@@ -25,15 +27,15 @@ native_output="$root/artifacts/native/$rid"
 publish_output="$root/artifacts/publish/$rid"
 app="$root/artifacts/products/$rid/OpenCV Distance Lab.app"
 
-cmake -S "$root" -B "$native_build" -G "Unix Makefiles" \
+"$cmake_command" -S "$root" -B "$native_build" -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="$architecture" \
   -DOpenCV_DIR="$OpenCV_DIR" -DCMAKE_INSTALL_PREFIX="$native_output"
-cmake --build "$native_build" --parallel --target distance_tracker_native distance_tracker_native_test
+"$cmake_command" --build "$native_build" --parallel --target distance_tracker_native distance_tracker_native_test
 "$native_build/native/distance_tracker_native_test"
-cmake --install "$native_build"
+"$cmake_command" --install "$native_build"
 
 rm -rf "$publish_output" "$app"
-dotnet publish "$root/src/OpenCVDistanceLab.App/OpenCVDistanceLab.App.csproj" \
+"$dotnet_command" publish "$root/src/OpenCVDistanceLab.App/OpenCVDistanceLab.App.csproj" \
   -c Release -r "$rid" --self-contained true -p:PublishReadyToRun=true \
   -p:UseSharedCompilation=false -m:1 -nodeReuse:false -o "$publish_output"
 

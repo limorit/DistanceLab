@@ -5,7 +5,7 @@ namespace OpenCVDistanceLab.Core;
 
 public sealed class ProductSettings
 {
-    public int SchemaVersion { get; set; } = 3;
+    public int SchemaVersion { get; set; } = 4;
     public string Theme { get; set; } = "System";
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -18,7 +18,7 @@ public sealed class ProductSettings
     public double MarkerSize { get; set; } = 12;
     public double MarkerWidth { get; set; } = 1.2;
     public double MarkerOpacity { get; set; } = .55;
-    public int WindowSize { get; set; } = 41;
+    public int WindowSize { get; set; } = 61;
     public int SearchRadius { get; set; } = 80;
     public double ReferenceThreshold { get; set; } = .48;
     public double ForwardBackwardThreshold { get; set; } = 1.5;
