@@ -27,13 +27,13 @@ tests/                           无第三方测试框架的 Core 自检
 
 ## 前置条件
 
-- .NET 10 SDK（LTS）或更新版本
-- CMake 3.24 或更新版本
-- OpenCV 4.x C++ 开发包，至少包含 `core`、`imgproc`、`imgcodecs`、`video` 和 `photo`
-- Windows：Visual Studio 2022 C++ 桌面工具链
+- Windows 一键构建：Visual Studio 2022“使用 C++ 的桌面开发”工作负载
+- macOS/手动构建：.NET 10 SDK（LTS）、CMake 3.24+ 和 OpenCV 4.x C++ 开发包
 - macOS：Xcode Command Line Tools
 
-OpenCV 的 CMake 包目录通过 `OpenCV_DIR` 指定。Windows 构建脚本也支持 `-OpenCvDir` 参数。
+Windows 脚本会自动使用 Visual Studio 自带的 CMake，并将缺少的 .NET 10 SDK 和经过
+SHA-256 校验的 OpenCV 4.13 下载到 `%LOCALAPPDATA%\DistanceLab`。这些依赖不会安装到
+系统目录，后续构建会直接复用缓存。
 
 ## macOS 构建
 
@@ -67,17 +67,23 @@ export APPLE_NOTARY_PROFILE="notarytool-keychain-profile"
 ## Windows 构建
 
 ```powershell
-$env:OpenCV_DIR = "D:\opencv\build"
 .\build.ps1
 ```
 
-也可以：
+首次构建需要联网下载约 500 MB 的依赖；后续可离线重复构建。脚本会依次完成原生库编译、
+Core/原生/发布版自检、自包含 .NET 发布以及 ZIP 打包。
+
+高级用法：
 
 ```powershell
-.\packaging\windows\build.ps1 -OpenCvDir "D:\opencv\build"
+.\build.ps1 -Configuration Debug
+.\build.ps1 -OpenCvDir "D:\opencv\build"
+.\build.ps1 -SkipArchive
 ```
 
-产物位于 `artifacts\publish\win-x64`，包含自包含 .NET 运行时、原生追踪库、OpenCV 和可找到的 MSVC 应用本地运行库。
+解压版产物位于 `artifacts\publish\win-x64`；可分发 ZIP 位于
+`artifacts\DistanceLab-<版本>-win-x64.zip`。二者均包含自包含 .NET 运行时、原生追踪库、
+OpenCV 和 MSVC 应用本地运行库。
 
 ## 自检
 
