@@ -26,6 +26,25 @@ public static class NativeBackend
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct NativeFilter
+    {
+        public int Method;
+        public double ContrastClipPercent;
+        public double Gamma;
+        public double DenoiseStrength;
+        public double RetinexSigma;
+
+        public NativeFilter(DisplaySettings settings)
+        {
+            Method = (int)settings.Method;
+            ContrastClipPercent = settings.ContrastClip;
+            Gamma = settings.Gamma;
+            DenoiseStrength = settings.DenoiseStrength;
+            RetinexSigma = settings.RetinexSigma;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct NativeResult
     {
         public NativePoint Point0;
@@ -45,24 +64,8 @@ public static class NativeBackend
     private static extern nint dt_last_error();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern nint dt_image_open(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string path, out int width, out int height);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern void dt_image_close(nint image);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern int dt_image_render(
-        nint image, int method, double contrastClip, double gamma,
-        double denoiseStrength, double retinexSigma, nint destination, int stride);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern int dt_image_render_tracking_input(
-        nint image, nint destination, int stride);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern nint dt_tracker_create(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string firstImage,
+    private static extern nint dt_tracker_create_prepared(
+        nint firstFrame,
         [In, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] NativePoint[] points,
         ref NativeSettings settings);
 
@@ -70,12 +73,12 @@ public static class NativeBackend
     private static extern void dt_tracker_destroy(nint tracker);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern int dt_tracker_step_prepared(
-        nint tracker, nint prepared, ref NativeSettings settings, out NativeResult result);
+    private static extern int dt_tracker_step_filtered(
+        nint tracker, nint prepared, ref NativeFilter filter, ref NativeSettings settings, out NativeResult result);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern nint dt_frame_prepare(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string path, out int width, out int height);
+    private static extern nint dt_frame_prepare_filtered(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path, ref NativeFilter filter, out int width, out int height);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     private static extern void dt_frame_prepare_destroy(nint prepared);
@@ -90,10 +93,8 @@ public static class NativeBackend
     private static extern void dt_tracker_snapshot_destroy(nint snapshot);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern int dt_tracker_snapshot_render(
-        nint snapshot, int method, double contrastClip, double gamma,
-        double denoiseStrength, double retinexSigma,
-        nint preview, int previewStride, nint tracking, int trackingStride);
+    private static extern int dt_filtered_frame_render(
+        nint frame, nint preview, int previewStride, nint tracking, int trackingStride);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     private static extern int dt_tracker_snapshot_render_patches(
@@ -104,7 +105,7 @@ public static class NativeBackend
         nint point2, int point2Stride);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    private static extern int dt_tracker_self_test();
+    private static extern int dt_filtered_tracker_self_test();
 
     public static string LastError =>
         Marshal.PtrToStringUTF8(dt_last_error()) ?? "未知的 OpenCV 原生错误。";
@@ -113,12 +114,20 @@ public static class NativeBackend
     {
         int version = dt_abi_version();
         if (version != 1) throw new InvalidOperationException($"不兼容的原生接口版本：{version}。");
-        if (dt_tracker_self_test() == 0) throw new InvalidOperationException(LastError);
+        try
+        {
+            if (dt_filtered_tracker_self_test() == 0) throw new InvalidOperationException(LastError);
+        }
+        catch (EntryPointNotFoundException error)
+        {
+            throw new InvalidOperationException("请更新配套的 OpenCV 原生追踪库以使用图像滤镜。", error);
+        }
     }
 
-    public static PreparedFrame PrepareFrame(string path)
+    public static PreparedFrame PrepareFrame(string path, DisplaySettings settings)
     {
-        nint handle = dt_frame_prepare(path, out int width, out int height);
+        NativeFilter filter = new(settings);
+        nint handle = dt_frame_prepare_filtered(path, ref filter, out int width, out int height);
         if (handle == 0)
             throw new InvalidOperationException(
                 $"无法读取图像“{Path.GetFileName(path)}”。{Environment.NewLine}" +
@@ -128,47 +137,43 @@ public static class NativeBackend
 
     public static PixelFrame RenderFrame(string path, DisplaySettings settings)
     {
-        nint image = dt_image_open(path, out int width, out int height);
-        if (image == 0) throw new InvalidOperationException(LastError);
-        try
+        using PreparedFrame prepared = PrepareFrame(path, settings);
+        return prepared.Render();
+    }
+
+    private static PixelFrame RenderPixels(nint handle, int width, int height)
+    {
+        int previewStride = checked(width * 4);
+        byte[] preview = new byte[checked(previewStride * height)];
+        byte[] tracking = new byte[checked(width * height)];
+        WithPinnedBuffers(preview, tracking, (previewPointer, trackingPointer) =>
         {
-            int previewStride = checked(width * 4);
-            int trackingStride = width;
-            byte[] preview = new byte[checked(previewStride * height)];
-            byte[] tracking = new byte[checked(trackingStride * height)];
-            WithPinnedBuffers(preview, tracking, (previewPointer, trackingPointer) =>
-            {
-                if (dt_image_render(
-                        image, (int)settings.Method, settings.ContrastClip, settings.Gamma,
-                        settings.DenoiseStrength, settings.RetinexSigma,
-                        previewPointer, previewStride) == 0 ||
-                    dt_image_render_tracking_input(image, trackingPointer, trackingStride) == 0)
-                    throw new InvalidOperationException(LastError);
-            });
-            return new PixelFrame(width, height, previewStride, preview, trackingStride, tracking);
-        }
-        finally { dt_image_close(image); }
+            if (dt_filtered_frame_render(handle, previewPointer, previewStride, trackingPointer, width) == 0)
+                throw new InvalidOperationException(LastError);
+        });
+        return new PixelFrame(width, height, previewStride, preview, width, tracking);
     }
 
     public sealed class Tracker : IDisposable
     {
         private nint _handle;
 
-        public Tracker(string firstImage, IReadOnlyList<PointD> points, TrackingSettings settings)
+        public Tracker(PreparedFrame firstFrame, IReadOnlyList<PointD> points, TrackingSettings settings)
         {
             if (points.Count != 2) throw new ArgumentException("追踪器需要两个初始点。", nameof(points));
             NativePoint[] nativePoints = [new(points[0].X, points[0].Y), new(points[1].X, points[1].Y)];
             NativeSettings nativeSettings = ToNative(settings);
-            _handle = dt_tracker_create(firstImage, nativePoints, ref nativeSettings);
+            _handle = dt_tracker_create_prepared(firstFrame.DangerousHandle, nativePoints, ref nativeSettings);
             if (_handle == 0) throw new InvalidOperationException(LastError);
         }
 
-        public TrackMeasurement Step(PreparedFrame prepared, TrackingSettings settings)
+        public TrackMeasurement Step(PreparedFrame prepared, TrackingSettings settings, DisplaySettings filter)
         {
             ThrowIfDisposed();
             NativeSettings nativeSettings = ToNative(settings);
-            if (dt_tracker_step_prepared(
-                    _handle, prepared.DangerousHandle, ref nativeSettings, out NativeResult result) == 0)
+            NativeFilter nativeFilter = new(filter);
+            if (dt_tracker_step_filtered(
+                    _handle, prepared.DangerousHandle, ref nativeFilter, ref nativeSettings, out NativeResult result) == 0)
                 throw new InvalidOperationException(LastError);
             return FromNative(result);
         }
@@ -223,6 +228,8 @@ public static class NativeBackend
             Height = height;
         }
 
+        public PixelFrame Render() => RenderPixels(DangerousHandle, Width, Height);
+
         public void Dispose()
         {
             if (_handle == 0) return;
@@ -247,23 +254,10 @@ public static class NativeBackend
             _height = height;
         }
 
-        public PixelFrame Render(DisplaySettings settings)
+        public PixelFrame Render()
         {
             ObjectDisposedException.ThrowIf(_handle == 0, this);
-            int previewStride = checked(_width * 4);
-            int trackingStride = _width;
-            byte[] preview = new byte[checked(previewStride * _height)];
-            byte[] tracking = new byte[checked(trackingStride * _height)];
-            WithPinnedBuffers(preview, tracking, (previewPointer, trackingPointer) =>
-            {
-                if (dt_tracker_snapshot_render(
-                        _handle, (int)settings.Method, settings.ContrastClip, settings.Gamma,
-                        settings.DenoiseStrength, settings.RetinexSigma,
-                        previewPointer, previewStride, trackingPointer, trackingStride) == 0)
-                    throw new InvalidOperationException(LastError);
-            });
-            return new PixelFrame(
-                _width, _height, previewStride, preview, trackingStride, tracking);
+            return RenderPixels(_handle, _width, _height);
         }
 
         public RecognitionPatches RenderRecognitionPatches(

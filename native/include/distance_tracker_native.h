@@ -43,6 +43,14 @@ enum DtDisplayMethod {
     DT_GAMMA = 6,
 };
 
+struct DtFilterSettings {
+    int method;
+    double contrastClipPercent;
+    double gamma;
+    double denoiseStrength;
+    double retinexSigma;
+};
+
 enum DtTrackStatus {
     DT_LOST = 0,
     DT_LK = 1,
@@ -110,4 +118,15 @@ DT_API int dt_tracker_snapshot_render_patches(
     int point1Stride,
     std::uint8_t* destinationPoint2,
     int point2Stride);
+
+// A prepared frame or tracker snapshot can be rendered from its actual tracking pixels.
+DT_API void* dt_frame_prepare_filtered(const char* imageUtf8Path, const DtFilterSettings* filter,
+                                      int* width, int* height);
+DT_API int dt_filtered_frame_render(void* frame, std::uint8_t* previewBgra, int previewStride,
+                                   std::uint8_t* trackingGray, int trackingStride);
+DT_API void* dt_tracker_create_prepared(void* firstFrame, const DtPoint* initialPoints,
+                                       const DtTrackerSettings* settings);
+DT_API int dt_tracker_step_filtered(void* tracker, void* preparedFrame, const DtFilterSettings* filter,
+                                   const DtTrackerSettings* settings, DtTrackResult* result);
+DT_API int dt_filtered_tracker_self_test();
 DT_API int dt_tracker_self_test();

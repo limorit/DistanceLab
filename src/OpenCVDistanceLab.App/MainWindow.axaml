@@ -159,8 +159,8 @@
                 <StackPanel Spacing="2">
                   <TextBlock Text="识别预览" Classes="section-title" />
                   <TextBlock x:Name="RecognitionWindowSizeText"
-                             Text="OpenCV CLAHE 追踪输入 · 稳定窗口 61 × 61 px"
-                             Classes="muted" FontSize="11" />
+                             Text="追踪窗口 61 × 61 px"
+                             Classes="muted" FontSize="11" TextWrapping="Wrap" />
                 </StackPanel>
                 <ComboBox x:Name="RecognitionScalingCombo" Grid.Column="1"
                           Width="112" SelectedIndex="0"
@@ -218,9 +218,9 @@
                   <Border Classes="inspector-section">
                     <StackPanel Spacing="9">
                       <StackPanel Spacing="2">
-                        <TextBlock Text="图像显示" Classes="section-title" />
-                        <TextBlock Text="只改变预览，不影响原始测量数据"
-                                   Classes="muted" FontSize="11" />
+                        <TextBlock Text="图像滤镜" Classes="section-title" />
+                        <TextBlock Text="滤镜同时用于预览和追踪。运行中调整时，从下一待计算帧生效。"
+                                   Classes="muted" FontSize="11" TextWrapping="Wrap" />
                       </StackPanel>
                       <ComboBox x:Name="DisplayMethodCombo"
                                 SelectionChanged="DisplaySetting_Changed" />

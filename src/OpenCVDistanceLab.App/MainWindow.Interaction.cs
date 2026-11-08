@@ -654,9 +654,9 @@ public sealed partial class MainWindow
         UpdateRecognitionText(1, P2RecognitionStateText);
     }
 
-    private void ApplyRecognitionPatches(NativeBackend.RecognitionPatches patches)
+    private void ApplyRecognitionPatches(NativeBackend.RecognitionPatches patches, DisplaySettings filter)
     {
-        UpdateRecognitionWindowDescription(true);
+        UpdateRecognitionWindowDescription(true, filter);
         ReplaceRecognitionBitmap(
             0, CreateBitmap(
                 patches.Point1, patches.Size, patches.Size, patches.Size,
@@ -669,12 +669,14 @@ public sealed partial class MainWindow
         UpdateRecognitionText(1, P2RecognitionStateText);
     }
 
-    private void UpdateRecognitionWindowDescription(bool live)
+    private void UpdateRecognitionWindowDescription(bool live, DisplaySettings? filter = null)
     {
         int size = ReadTrackingSettings().WindowSize;
+        DisplayMethod method = (filter ?? _pixelFilter ?? ReadDisplaySettings()).Method;
+        string name = _displayOptions.First(option => option.Method == method).Name;
         RecognitionWindowSizeText.Text = live
-            ? $"● 实时 · OpenCV CLAHE · {size} × {size} px"
-            : $"OpenCV CLAHE 追踪输入 · 稳定窗口 {size} × {size} px";
+            ? $"● 实时 · {name} · {size} × {size} px"
+            : $"{name} · 追踪窗口 {size} × {size} px";
         if (live) RecognitionWindowSizeText.Foreground = ReadyStateBrush;
         else RecognitionWindowSizeText.ClearValue(TextBlock.ForegroundProperty);
     }

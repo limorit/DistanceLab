@@ -1,6 +1,8 @@
 #include "distance_tracker_native.h"
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/photo.hpp>
 #include <opencv2/video/tracking.hpp>
 
@@ -127,39 +129,46 @@ cv::Mat retinex(const cv::Mat& gray, double sigma) {
     return result;
 }
 
-cv::Mat enhance(
-    const cv::Mat& bgr, int method, double contrastClip,
-    double gamma, double denoiseStrength, double retinexSigma) {
-    if (method == DT_ORIGINAL) return bgr.clone();
+// The original C API has no filter argument and historically uses CLAHE 2.0.
+constexpr DtFilterSettings legacyTrackingFilter{-1, 0, 1, 0, 0};
+
+bool operator==(const DtFilterSettings& a, const DtFilterSettings& b) {
+    return a.method == b.method && a.contrastClipPercent == b.contrastClipPercent &&
+        a.gamma == b.gamma && a.denoiseStrength == b.denoiseStrength && a.retinexSigma == b.retinexSigma;
+}
+
+cv::Mat filterGray(const cv::Mat& bgr, const DtFilterSettings& filter) {
     cv::Mat gray;
     cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
     cv::Mat output;
-    switch (method) {
+    switch (filter.method) {
     case DT_LINEAR_CONTRAST:
-        output = percentileStretch(gray, contrastClip);
+        output = percentileStretch(gray, filter.contrastClipPercent);
         break;
     case DT_HISTOGRAM_EQUALIZATION:
         cv::equalizeHist(gray, output);
         break;
+    case legacyTrackingFilter.method:
     case DT_CLAHE: {
-        auto clahe = cv::createCLAHE(1.6, cv::Size(8, 8));
+        const double limit = filter.method == DT_CLAHE ? 1.6 : 2.0;
+        auto clahe = cv::createCLAHE(limit, cv::Size(8, 8));
         clahe->apply(gray, output);
         break;
     }
     case DT_NLM_CLAHE: {
         cv::Mat denoised;
         cv::fastNlMeansDenoising(
-            gray, denoised, static_cast<float>(std::clamp(denoiseStrength, 0.0, 30.0)),
+            gray, denoised, static_cast<float>(std::clamp(filter.denoiseStrength, 0.0, 30.0)),
             7, 21);
         auto clahe = cv::createCLAHE(1.6, cv::Size(8, 8));
         clahe->apply(denoised, output);
         break;
     }
     case DT_RETINEX:
-        output = retinex(gray, retinexSigma);
+        output = retinex(gray, filter.retinexSigma);
         break;
     case DT_GAMMA: {
-        gamma = std::clamp(gamma, 0.05, 5.0);
+        const double gamma = std::clamp(filter.gamma, 0.05, 5.0);
         cv::Mat lut(1, 256, CV_8U);
         for (int i = 0; i < 256; ++i) {
             lut.at<unsigned char>(i) = cv::saturate_cast<unsigned char>(
@@ -168,21 +177,40 @@ cv::Mat enhance(
         cv::LUT(gray, lut, output);
         break;
     }
+    case DT_ORIGINAL:
     default:
         output = gray;
         break;
     }
-    cv::Mat bgrOutput;
-    cv::cvtColor(output, bgrOutput, cv::COLOR_GRAY2BGR);
-    return bgrOutput;
+    return output;
 }
 
-cv::Mat preprocess(const cv::Mat& bgr) {
-    cv::Mat gray, normalized;
-    cv::cvtColor(bgr, gray, cv::COLOR_BGR2GRAY);
-    cv::createCLAHE(2.0, cv::Size(8, 8))->apply(gray, normalized);
-    return normalized;
-}
+struct FilteredFrame {
+    cv::Mat bgr;
+    cv::Mat gray;
+    DtFilterSettings filter;
+
+    FilteredFrame(const cv::Mat& source, const DtFilterSettings& settings)
+        : bgr(source), gray(filterGray(source, settings)), filter(settings) {}
+
+    FilteredFrame withFilter(const DtFilterSettings& settings) const {
+        if (settings == filter) return *this;
+        return FilteredFrame(bgr, settings);
+    }
+
+    void renderPreview(std::uint8_t* preview, int stride) const {
+        if (!preview || stride < gray.cols * 4) throw std::runtime_error("Invalid preview buffer.");
+        cv::Mat bgra(gray.size(), CV_8UC4, preview, static_cast<std::size_t>(stride));
+        if (filter.method == DT_ORIGINAL) cv::cvtColor(bgr, bgra, cv::COLOR_BGR2BGRA);
+        else cv::cvtColor(gray, bgra, cv::COLOR_GRAY2BGRA);
+    }
+
+    void renderTracking(std::uint8_t* tracking, int stride) const {
+        if (!tracking || stride < gray.cols) throw std::runtime_error("Invalid tracking buffer.");
+        cv::Mat destination(gray.size(), gray.type(), tracking, static_cast<std::size_t>(stride));
+        gray.copyTo(destination);
+    }
+};
 
 bool inside(const cv::Mat& image, cv::Point2f point, int margin) {
     return point.x >= margin && point.y >= margin &&
@@ -269,15 +297,12 @@ Match matchTemplate(
 
 class Tracker {
 public:
-    Tracker(const char* path, const DtPoint* points, const DtTrackerSettings& settings) {
-        previousBgr_ = readImage(path);
-        previousGray_ = preprocess(previousBgr_);
+    Tracker(const FilteredFrame& firstFrame, const DtPoint* points, const DtTrackerSettings& settings)
+        : previous_(firstFrame), reference_(firstFrame) {
         points_[0] = cv::Point2f(static_cast<float>(points[0].x), static_cast<float>(points[0].y));
         points_[1] = cv::Point2f(static_cast<float>(points[1].x), static_cast<float>(points[1].y));
-        referenceGray_ = previousGray_.clone();
-        referencePoints_ = points_;
         updateSettings(settings);
-        rebuildTemplates();
+        resetReference();
     }
 
     void updateSettings(const DtTrackerSettings& value) {
@@ -290,27 +315,50 @@ public:
         referenceSize_ = std::clamp(settings_.windowSize, 31, 61) | 1;
     }
 
-    void rebuildTemplates() {
+    void resetReference() {
+        reference_ = previous_;
+        referencePoints_ = points_;
         for (int i = 0; i < 2; ++i) {
-            referenceTemplates_[i] = patchAt(previousGray_, points_[i], referenceSize_);
-            keyframeTemplates_[i] = referenceTemplates_[i].clone();
+            referenceTemplates_[i] = patchAt(reference_.gray, referencePoints_[i], referenceSize_);
+            keyframes_[i] = {{}, referencePoints_[i], referenceTemplates_[i]};
         }
     }
 
+    void refilterHistory(const DtFilterSettings& filter) {
+        if (previous_.filter == filter) return;
+        FilteredFrame previous = previous_.withFilter(filter);
+        FilteredFrame reference = reference_.bgr.data == previous.bgr.data
+            ? previous : reference_.withFilter(filter);
+        std::array<cv::Mat, 2> referencePatches, keyframePatches;
+        for (int i = 0; i < 2; ++i) {
+            referencePatches[i] = patchAt(reference.gray, referencePoints_[i], referenceSize_);
+            const auto& key = keyframes_[i];
+            if (key.bgr.empty()) {
+                keyframePatches[i] = referencePatches[i];
+            } else {
+                // Filters such as equalization and Retinex need the entire source image.
+                const cv::Mat gray = key.bgr.data == previous.bgr.data
+                    ? previous.gray : filterGray(key.bgr, filter);
+                keyframePatches[i] = patchAt(gray, key.point, referenceSize_);
+            }
+        }
+        previous_ = std::move(previous);
+        reference_ = std::move(reference);
+        referenceTemplates_ = std::move(referencePatches);
+        for (int i = 0; i < 2; ++i) keyframes_[i].patch = std::move(keyframePatches[i]);
+    }
+
     int step(const char* path, const DtTrackerSettings& settings, DtTrackResult& output) {
-        cv::Mat bgr = readImage(path);
-        cv::Mat gray = preprocess(bgr);
-        return stepPrepared(bgr, gray, settings, output);
+        return stepPrepared(FilteredFrame(readImage(path), previous_.filter), settings, output);
     }
 
     int stepPrepared(
-        const cv::Mat& bgr, const cv::Mat& gray,
+        const FilteredFrame& frame,
         const DtTrackerSettings& settings, DtTrackResult& output) {
-        updateSettings(settings);
-        if (bgr.empty() || gray.empty() || bgr.size() != previousBgr_.size() || gray.size() != previousGray_.size())
+        if (frame.gray.size() != previous_.gray.size())
             throw std::runtime_error("Prepared frame size does not match the tracking sequence.");
-        currentBgr_ = bgr;
-        currentGray_ = gray;
+        updateSettings(settings);
+        refilterHistory(frame.filter);
         const std::vector<cv::Point2f> oldPoints{points_[0], points_[1]};
         std::vector<cv::Point2f> predicted{
             points_[0] + velocities_[0], points_[1] + velocities_[1]};
@@ -318,7 +366,7 @@ public:
         std::vector<unsigned char> forwardStatus;
         std::vector<float> forwardError;
         cv::calcOpticalFlowPyrLK(
-            previousGray_, currentGray_, oldPoints, forward,
+            previous_.gray, frame.gray, oldPoints, forward,
             forwardStatus, forwardError, cv::Size(settings_.windowSize, settings_.windowSize),
             4, cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
             cv::OPTFLOW_USE_INITIAL_FLOW, 1.0e-5);
@@ -326,7 +374,7 @@ public:
         std::vector<unsigned char> backwardStatus;
         std::vector<float> backwardError;
         cv::calcOpticalFlowPyrLK(
-            currentGray_, previousGray_, forward, backward,
+            frame.gray, previous_.gray, forward, backward,
             backwardStatus, backwardError, cv::Size(settings_.windowSize, settings_.windowSize),
             4, cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
             cv::OPTFLOW_USE_INITIAL_FLOW, 1.0e-5);
@@ -336,7 +384,7 @@ public:
         std::vector<unsigned char> referenceForwardStatus;
         std::vector<float> referenceForwardError;
         cv::calcOpticalFlowPyrLK(
-            referenceGray_, currentGray_, referencePoints, referenceForward,
+            reference_.gray, frame.gray, referencePoints, referenceForward,
             referenceForwardStatus, referenceForwardError,
             cv::Size(settings_.windowSize, settings_.windowSize), 4,
             cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
@@ -345,7 +393,7 @@ public:
         std::vector<unsigned char> referenceBackwardStatus;
         std::vector<float> referenceBackwardError;
         cv::calcOpticalFlowPyrLK(
-            currentGray_, referenceGray_, referenceForward, referenceBackward,
+            frame.gray, reference_.gray, referenceForward, referenceBackward,
             referenceBackwardStatus, referenceBackwardError,
             cv::Size(settings_.windowSize, settings_.windowSize), 4,
             cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 50, 0.0005),
@@ -366,18 +414,18 @@ public:
                 PointOutcome outcome;
                 outcome.candidate = forward[i];
                 outcome.quality = patchCorrelation(
-                    patchAt(previousGray_, points_[i], templateSize_),
-                    patchAt(currentGray_, outcome.candidate, templateSize_));
+                    patchAt(previous_.gray, points_[i], templateSize_),
+                    patchAt(frame.gray, outcome.candidate, templateSize_));
                 outcome.valid = i < static_cast<int>(forwardStatus.size()) && forwardStatus[i] &&
                     i < static_cast<int>(backwardStatus.size()) && backwardStatus[i] &&
                     cv::norm(backward[i] - points_[i]) <= settings_.forwardBackwardThreshold &&
                     outcome.quality >= 0.30 &&
-                    inside(currentGray_, outcome.candidate, templateSize_ / 2 + 2);
+                    inside(frame.gray, outcome.candidate, templateSize_ / 2 + 2);
                 outcome.continuous = outcome.valid;
                 outcome.status = outcome.valid ? DT_LK : DT_LOST;
                 const double referenceQuality = patchCorrelation(
-                    patchAt(referenceGray_, referencePoints_[i], templateSize_),
-                    patchAt(currentGray_, referenceForward[i], templateSize_));
+                    patchAt(reference_.gray, referencePoints_[i], templateSize_),
+                    patchAt(frame.gray, referenceForward[i], templateSize_));
                 const bool referenceValid =
                     i < static_cast<int>(referenceForwardStatus.size()) &&
                     referenceForwardStatus[i] &&
@@ -386,7 +434,7 @@ public:
                     cv::norm(referenceBackward[i] - referencePoints_[i]) <=
                         settings_.forwardBackwardThreshold &&
                     referenceQuality >= 0.30 &&
-                    inside(currentGray_, referenceForward[i], templateSize_ / 2 + 2);
+                    inside(frame.gray, referenceForward[i], templateSize_ / 2 + 2);
                 if (referenceValid) {
                     if (!outcome.valid) {
                         outcome.candidate = referenceForward[i];
@@ -409,7 +457,7 @@ public:
                     const int localRadius = std::min(
                         settings_.searchRadius, std::max(12, settings_.windowSize / 2));
                     const Match local = matchTemplate(
-                        patchAt(previousGray_, points_[i], templateSize_), currentGray_,
+                        patchAt(previous_.gray, points_[i], templateSize_), frame.gray,
                         predicted[i], localRadius);
                     if (local.valid && local.score >= 0.45 && local.psr >= 4.0) {
                         outcome.candidate = local.point;
@@ -423,7 +471,7 @@ public:
                 }
                 if (!outcome.valid) {
                     const Match anchored = matchTemplate(
-                        referenceTemplates_[i], currentGray_, predicted[i],
+                        referenceTemplates_[i], frame.gray, predicted[i],
                         settings_.searchRadius);
                     if (anchored.valid &&
                         anchored.score >= settings_.referenceThreshold && anchored.psr >= 4.5) {
@@ -433,12 +481,12 @@ public:
                         outcome.status = DT_REFERENCE;
                         outcome.replaceKeyframe = true;
                         outcome.replacementKeyframe =
-                            patchAt(currentGray_, outcome.candidate, referenceSize_);
+                            patchAt(frame.gray, outcome.candidate, referenceSize_);
                     }
                 }
                 if (!outcome.valid) {
                     const Match keyframed = matchTemplate(
-                        keyframeTemplates_[i], currentGray_, predicted[i],
+                        keyframes_[i].patch, frame.gray, predicted[i],
                         settings_.searchRadius);
                     if (keyframed.valid &&
                         keyframed.score >=
@@ -474,50 +522,48 @@ public:
             output.statuses[i] = outcome.status;
             output.valid[i] = outcome.valid ? 1 : 0;
             if (outcome.replaceKeyframe)
-                keyframeTemplates_[i] = outcome.replacementKeyframe;
+                keyframes_[i] = {frame.bgr, outcome.candidate, outcome.replacementKeyframe};
         }
         for (int i = 0; i < 2; ++i) {
             velocities_[i] = nextVelocities[i];
             points_[i] = newPoints_[i];
         }
-        previousBgr_ = currentBgr_;
-        previousGray_ = currentGray_;
+        previous_ = frame;
         return 1;
     }
 
     bool reselect(int index, DtPoint point) {
-        if (index < 0 || index > 1 || previousGray_.empty()) return false;
+        if (index < 0 || index > 1 || previous_.gray.empty()) return false;
         const cv::Point2f selected(static_cast<float>(point.x), static_cast<float>(point.y));
-        cv::Mat patch = patchAt(previousGray_, selected, referenceSize_);
+        cv::Mat patch = patchAt(previous_.gray, selected, referenceSize_);
         if (patch.empty()) return false;
         points_[index] = selected;
         velocities_[0] = velocities_[1] = {};
-        referenceGray_ = previousGray_.clone();
-        referencePoints_ = points_;
-        rebuildTemplates();
+        resetReference();
         return true;
     }
 
-    std::pair<cv::Mat, cv::Mat> snapshot() const {
-        return {previousBgr_, previousGray_};
-    }
+    const FilteredFrame& snapshot() const { return previous_; }
 
 private:
     DtTrackerSettings settings_{};
     int templateSize_ = 41;
     int referenceSize_ = 41;
-    cv::Mat previousBgr_, previousGray_, currentBgr_, currentGray_, referenceGray_;
+    FilteredFrame previous_, reference_;
     std::array<cv::Point2f, 2> points_{};
     std::array<cv::Point2f, 2> referencePoints_{};
     std::array<cv::Point2f, 2> newPoints_{};
     std::array<cv::Point2f, 2> velocities_{};
     std::array<cv::Mat, 2> referenceTemplates_{};
-    std::array<cv::Mat, 2> keyframeTemplates_{};
+    struct Keyframe {
+        cv::Mat bgr; // Empty when the fixed reference is also the keyframe.
+        cv::Point2f point;
+        cv::Mat patch;
+    };
+    std::array<Keyframe, 2> keyframes_{};
 };
 
 struct ImageHandle { cv::Mat image; };
-struct PreparedFrame { cv::Mat bgr; cv::Mat gray; };
-struct TrackerSnapshot { cv::Mat bgr; cv::Mat gray; };
 
 template <typename Function>
 int protect(Function&& function) {
@@ -563,16 +609,8 @@ int dt_image_render(
     std::uint8_t* destination, int destinationStride) {
     return protect([&] {
         if (!image || !destination) throw std::runtime_error("Invalid image render argument.");
-        const cv::Mat rendered = enhance(
-            static_cast<ImageHandle*>(image)->image, method, contrastClip,
-            gamma, denoiseStrength, retinexSigma);
-        cv::Mat bgra;
-        cv::cvtColor(rendered, bgra, cv::COLOR_BGR2BGRA);
-        if (destinationStride < bgra.cols * 4) throw std::runtime_error("Destination stride is too small.");
-        for (int y = 0; y < bgra.rows; ++y) {
-            std::memcpy(destination + static_cast<std::size_t>(y) * destinationStride,
-                        bgra.ptr(y), static_cast<std::size_t>(bgra.cols) * 4);
-        }
+        const DtFilterSettings filter{method, contrastClip, gamma, denoiseStrength, retinexSigma};
+        FilteredFrame(static_cast<ImageHandle*>(image)->image, filter).renderPreview(destination, destinationStride);
     });
 }
 
@@ -580,12 +618,8 @@ int dt_image_render_tracking_input(
     void* image, std::uint8_t* destination, int destinationStride) {
     return protect([&] {
         if (!image || !destination) throw std::runtime_error("Invalid tracking input render argument.");
-        const cv::Mat trackingInput = preprocess(static_cast<ImageHandle*>(image)->image);
-        if (destinationStride < trackingInput.cols) throw std::runtime_error("Destination stride is too small.");
-        for (int y = 0; y < trackingInput.rows; ++y) {
-            std::memcpy(destination + static_cast<std::size_t>(y) * destinationStride,
-                        trackingInput.ptr(y), static_cast<std::size_t>(trackingInput.cols));
-        }
+        FilteredFrame(static_cast<ImageHandle*>(image)->image, legacyTrackingFilter)
+            .renderTracking(destination, destinationStride);
     });
 }
 
@@ -594,13 +628,22 @@ void* dt_tracker_create(
     try {
         g_lastError.clear();
         if (!points || !settings) throw std::runtime_error("Invalid tracker arguments.");
-        return new Tracker(path, points, *settings);
+        return new Tracker(FilteredFrame(readImage(path), legacyTrackingFilter), points, *settings);
     } catch (const cv::Exception& error) {
         setError(std::string("OpenCV: ") + error.what());
     } catch (const std::exception& error) {
         setError(error.what());
     }
     return nullptr;
+}
+
+void* dt_tracker_create_prepared(void* firstFrame, const DtPoint* points, const DtTrackerSettings* settings) {
+    std::unique_ptr<Tracker> tracker;
+    protect([&] {
+        if (!firstFrame || !points || !settings) throw std::runtime_error("Invalid tracker arguments.");
+        tracker = std::make_unique<Tracker>(*static_cast<FilteredFrame*>(firstFrame), points, *settings);
+    });
+    return tracker.release();
 }
 
 void dt_tracker_destroy(void* tracker) { delete static_cast<Tracker*>(tracker); }
@@ -615,11 +658,14 @@ int dt_tracker_step(
 }
 
 void* dt_frame_prepare(const char* path, int* width, int* height) {
+    return dt_frame_prepare_filtered(path, &legacyTrackingFilter, width, height);
+}
+
+void* dt_frame_prepare_filtered(const char* path, const DtFilterSettings* filter, int* width, int* height) {
     try {
         g_lastError.clear();
-        auto prepared = std::make_unique<PreparedFrame>();
-        prepared->bgr = readImage(path);
-        prepared->gray = preprocess(prepared->bgr);
+        if (!filter) throw std::runtime_error("Missing frame filter.");
+        auto prepared = std::make_unique<FilteredFrame>(readImage(path), *filter);
         if (width) *width = prepared->bgr.cols;
         if (height) *height = prepared->bgr.rows;
         return prepared.release();
@@ -632,7 +678,7 @@ void* dt_frame_prepare(const char* path, int* width, int* height) {
 }
 
 void dt_frame_prepare_destroy(void* preparedFrame) {
-    delete static_cast<PreparedFrame*>(preparedFrame);
+    delete static_cast<FilteredFrame*>(preparedFrame);
 }
 
 int dt_tracker_step_prepared(
@@ -641,9 +687,18 @@ int dt_tracker_step_prepared(
     return protect([&] {
         if (!tracker || !preparedFrame || !settings || !result)
             throw std::runtime_error("Invalid prepared tracker step arguments.");
-        const auto* prepared = static_cast<PreparedFrame*>(preparedFrame);
-        static_cast<Tracker*>(tracker)->stepPrepared(
-            prepared->bgr, prepared->gray, *settings, *result);
+        static_cast<Tracker*>(tracker)->stepPrepared(*static_cast<FilteredFrame*>(preparedFrame), *settings, *result);
+    });
+}
+
+int dt_tracker_step_filtered(
+    void* tracker, void* preparedFrame, const DtFilterSettings* filter,
+    const DtTrackerSettings* settings, DtTrackResult* result) {
+    return protect([&] {
+        if (!tracker || !preparedFrame || !filter || !settings || !result)
+            throw std::runtime_error("Invalid filtered tracker step arguments.");
+        const auto* prepared = static_cast<FilteredFrame*>(preparedFrame);
+        static_cast<Tracker*>(tracker)->stepPrepared(prepared->withFilter(*filter), *settings, *result);
     });
 }
 
@@ -659,15 +714,9 @@ void* dt_tracker_snapshot_create(void* tracker, int* width, int* height) {
     try {
         g_lastError.clear();
         if (!tracker) throw std::runtime_error("Invalid tracker snapshot argument.");
-        auto [bgr, gray] = static_cast<Tracker*>(tracker)->snapshot();
-        if (bgr.empty() || gray.empty()) throw std::runtime_error("The tracker has no current frame.");
-        auto snapshot = std::make_unique<TrackerSnapshot>();
-        // cv::Mat copies are immutable, reference-counted snapshots. The next tracker
-        // step can replace its matrices without invalidating these frame buffers.
-        snapshot->bgr = bgr;
-        snapshot->gray = gray;
-        if (width) *width = bgr.cols;
-        if (height) *height = bgr.rows;
+        auto snapshot = std::make_unique<FilteredFrame>(static_cast<Tracker*>(tracker)->snapshot());
+        if (width) *width = snapshot->gray.cols;
+        if (height) *height = snapshot->gray.rows;
         return snapshot.release();
     } catch (const cv::Exception& error) {
         setError(std::string("OpenCV: ") + error.what());
@@ -678,7 +727,7 @@ void* dt_tracker_snapshot_create(void* tracker, int* width, int* height) {
 }
 
 void dt_tracker_snapshot_destroy(void* snapshot) {
-    delete static_cast<TrackerSnapshot*>(snapshot);
+    delete static_cast<FilteredFrame*>(snapshot);
 }
 
 int dt_tracker_snapshot_render(
@@ -689,19 +738,20 @@ int dt_tracker_snapshot_render(
     return protect([&] {
         if (!snapshot || !preview || !tracking)
             throw std::runtime_error("Invalid tracker snapshot render argument.");
-        const auto* frame = static_cast<TrackerSnapshot*>(snapshot);
-        const cv::Mat rendered = enhance(
-            frame->bgr, method, contrastClip, gamma, denoiseStrength, retinexSigma);
-        cv::Mat bgra;
-        cv::cvtColor(rendered, bgra, cv::COLOR_BGR2BGRA);
-        if (previewStride < bgra.cols * 4 || trackingStride < frame->gray.cols)
-            throw std::runtime_error("Snapshot destination stride is too small.");
-        for (int y = 0; y < bgra.rows; ++y) {
-            std::memcpy(preview + static_cast<std::size_t>(y) * previewStride,
-                        bgra.ptr(y), static_cast<std::size_t>(bgra.cols) * 4);
-            std::memcpy(tracking + static_cast<std::size_t>(y) * trackingStride,
-                        frame->gray.ptr(y), static_cast<std::size_t>(frame->gray.cols));
-        }
+        const auto* frame = static_cast<FilteredFrame*>(snapshot);
+        frame->withFilter({method, contrastClip, gamma, denoiseStrength, retinexSigma})
+            .renderPreview(preview, previewStride);
+        frame->renderTracking(tracking, trackingStride);
+    });
+}
+
+int dt_filtered_frame_render(
+    void* frame, std::uint8_t* preview, int previewStride, std::uint8_t* tracking, int trackingStride) {
+    return protect([&] {
+        if (!frame) throw std::runtime_error("Missing filtered frame.");
+        const auto* filtered = static_cast<FilteredFrame*>(frame);
+        filtered->renderPreview(preview, previewStride);
+        filtered->renderTracking(tracking, trackingStride);
     });
 }
 
@@ -714,7 +764,7 @@ int dt_tracker_snapshot_render_patches(
             throw std::runtime_error("Invalid recognition patch render argument.");
         if (patchSize < 1 || point1Stride < patchSize || point2Stride < patchSize)
             throw std::runtime_error("Recognition patch dimensions are invalid.");
-        const auto* frame = static_cast<TrackerSnapshot*>(snapshot);
+        const auto* frame = static_cast<FilteredFrame*>(snapshot);
         std::array<std::uint8_t*, 2> destinations{point1, point2};
         std::array<int, 2> strides{point1Stride, point2Stride};
         for (int index = 0; index < 2; ++index) {
@@ -736,7 +786,20 @@ int dt_tracker_snapshot_render_patches(
 }
 
 int dt_tracker_self_test() {
+    return dt_filtered_tracker_self_test();
+}
+
+int dt_filtered_tracker_self_test() {
     return protect([] {
+        const cv::Mat midGray(1, 1, CV_8UC3, cv::Scalar::all(128));
+        const FilteredFrame filtered(midGray, {DT_GAMMA, 1, 2.0, 5, 8});
+        std::array<std::uint8_t, 4> preview{};
+        std::uint8_t gray = 0;
+        filtered.renderPreview(preview.data(), 4);
+        filtered.renderTracking(&gray, 1);
+        if (gray != 64 || preview != std::array<std::uint8_t, 4>{64, 64, 64, 255})
+            throw std::runtime_error("Gamma tracking/preview buffer self-test failed.");
+
         cv::Mat source(160, 220, CV_8U);
         cv::RNG random(20260716);
         random.fill(source, cv::RNG::UNIFORM, 10, 245);

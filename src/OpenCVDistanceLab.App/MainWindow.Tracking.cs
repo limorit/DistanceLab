@@ -28,13 +28,26 @@ public sealed partial class MainWindow
                 return;
             _visualSession++;
             DisposePendingSnapshot();
-            await RestoreInitialTrackingStateAsync();
+            _previewTimer.Stop();
+            _previewGeneration++;
+            PreviewBusy.IsVisible = false;
+            RestoreInitialTrackingState();
+            string firstPath = _imagePaths[0];
+            while (true)
+            {
+                DisplaySettings filter = ReadDisplaySettings();
+                using var first = await Task.Run(() => NativeBackend.PrepareFrame(firstPath, filter));
+                PixelFrame rendered = await Task.Run(first.Render);
+                if (filter != ReadDisplaySettings()) continue;
+                ApplyPixelFrame(rendered, filter);
+                _tracker?.Dispose();
+                _tracker = new NativeBackend.Tracker(first, _initialTrackingPoints, ReadTrackingSettings());
+                break;
+            }
             string snapshot = SaveTrackingStartSnapshot();
             _trackingCancellation = new CancellationTokenSource();
-            _tracker?.Dispose();
-            PointD[] runStartPoints = [_initialTrackingPoints[0], _initialTrackingPoints[1]];
-            _tracker = new NativeBackend.Tracker(_imagePaths[0], runStartPoints, ReadTrackingSettings());
             _running = true;
+            _starting = false;
             _paused = false;
             _pauseConfirmed = false;
             _liveRecords.Clear();
@@ -72,12 +85,12 @@ public sealed partial class MainWindow
             _tracker = null;
             UpdatePointUiState();
             UpdateControls();
+            if (_pixelFilter != ReadDisplaySettings()) SchedulePreview();
         }
     }
 
-    private async Task RestoreInitialTrackingStateAsync()
+    private void RestoreInitialTrackingState()
     {
-        bool refreshFirstFrame = _currentFrame != 0 || _currentMeasurement is not null;
         _currentFrame = 0;
         _currentMeasurement = null;
         for (int index = 0; index < 2; index++)
@@ -92,8 +105,6 @@ public sealed partial class MainWindow
         UpdateDistance(_trackingPoints[0].DistanceTo(_trackingPoints[1]));
         UpdatePointUiState();
         UpdateControls();
-        if (refreshFirstFrame) await RefreshPreviewAsync(true);
-        else DrawOverlay();
     }
 
     private string SaveTrackingStartSnapshot()
@@ -173,6 +184,7 @@ public sealed partial class MainWindow
                 {
                     SchedulePreparedFrame(preparedTasks, frame + 2);
                     TrackingSettings settings = ReadTrackingSettings();
+                    DisplaySettings filter = ReadDisplaySettings();
                     bool recognitionDue = _lastRecognitionRefreshTicks == 0 ||
                         Stopwatch.GetElapsedTime(_lastRecognitionRefreshTicks).TotalMilliseconds >= 33 ||
                         frame == _imagePaths.Count - 1;
@@ -180,7 +192,7 @@ public sealed partial class MainWindow
                         NativeBackend.TrackerSnapshot snapshot,
                         NativeBackend.RecognitionPatches? recognition) = await Task.Run(() =>
                         {
-                            TrackMeasurement result = _tracker!.Step(prepared, settings);
+                            TrackMeasurement result = _tracker!.Step(prepared, settings, filter);
                             NativeBackend.TrackerSnapshot currentSnapshot = _tracker.Snapshot();
                             NativeBackend.RecognitionPatches? livePatches = null;
                             if (recognitionDue || result.Valid.Any(valid => !valid))
@@ -207,14 +219,14 @@ public sealed partial class MainWindow
                     SetCurrentFrame(frame, measurement);
                     if (recognition is not null)
                     {
-                        ApplyRecognitionPatches(recognition);
+                        ApplyRecognitionPatches(recognition, filter);
                         _lastRecognitionRefreshTicks = Stopwatch.GetTimestamp();
                     }
                     bool lost = settings.PauseOnLoss && measurement.Valid.Any(valid => !valid);
                     if (lost || frame == _imagePaths.Count - 1)
-                        await RenderExactSnapshotAsync(frame, snapshot, ReadDisplaySettings());
+                        await RenderExactSnapshotAsync(frame, snapshot, filter);
                     else
-                        QueueSnapshot(frame, snapshot, ReadDisplaySettings());
+                        QueueSnapshot(frame, snapshot, filter);
 
                     if (lost)
                     {
@@ -252,17 +264,18 @@ public sealed partial class MainWindow
     {
         if (frame >= _imagePaths.Count || tasks.ContainsKey(frame)) return;
         string path = _imagePaths[frame];
-        tasks[frame] = Task.Run(() => PrepareTrackingFrame(path, frame));
+        DisplaySettings filter = ReadDisplaySettings();
+        tasks[frame] = Task.Run(() => PrepareTrackingFrame(path, frame, filter));
     }
 
-    private static NativeBackend.PreparedFrame PrepareTrackingFrame(string path, int frame)
+    private static NativeBackend.PreparedFrame PrepareTrackingFrame(string path, int frame, DisplaySettings filter)
     {
-        try { return NativeBackend.PrepareFrame(path); }
+        try { return NativeBackend.PrepareFrame(path, filter); }
         catch (Exception first)
         {
             GC.Collect(1, GCCollectionMode.Forced, true, false);
             Thread.Sleep(250);
-            try { return NativeBackend.PrepareFrame(path); }
+            try { return NativeBackend.PrepareFrame(path, filter); }
             catch (Exception second)
             {
                 throw new InvalidOperationException(
@@ -317,7 +330,7 @@ public sealed partial class MainWindow
     {
         try
         {
-            while (_pendingSnapshot is not null)
+            while (session == _visualSession && _pendingSnapshot is not null)
             {
                 NativeBackend.TrackerSnapshot snapshot = _pendingSnapshot;
                 int frame = _pendingSnapshotFrame;
@@ -325,16 +338,16 @@ public sealed partial class MainWindow
                 _pendingSnapshot = null;
                 try
                 {
-                    PixelFrame rendered = await Task.Run(() => snapshot.Render(settings));
-                    if (session == _visualSession && frame == _currentFrame) ApplyPixelFrame(rendered);
+                    PixelFrame rendered = await Task.Run(snapshot.Render);
+                    if (session == _visualSession && frame == _currentFrame &&
+                        (!_pauseConfirmed || settings == ReadDisplaySettings()))
+                        ApplyPixelFrame(rendered, settings);
                 }
                 catch (Exception error)
                 {
                     if (session == _visualSession) SetStatus($"追踪预览跳过：{error.Message}", true);
                 }
                 finally { snapshot.Dispose(); }
-                if (settings.Method is DisplayMethod.NlmClahe or DisplayMethod.Retinex)
-                    await Task.Delay(350);
             }
         }
         finally
@@ -354,8 +367,8 @@ public sealed partial class MainWindow
         DisposePendingSnapshot();
         try
         {
-            PixelFrame rendered = await Task.Run(() => snapshot.Render(settings));
-            if (frame == _currentFrame) ApplyPixelFrame(rendered);
+            PixelFrame rendered = await Task.Run(snapshot.Render);
+            if (frame == _currentFrame) ApplyPixelFrame(rendered, settings);
         }
         catch (Exception error) { SetStatus($"当前帧预览失败：{error.Message}", true); }
         finally { snapshot.Dispose(); }
@@ -373,6 +386,7 @@ public sealed partial class MainWindow
         if (!_paused) return;
         _pauseConfirmed = true;
         _trackingClock.Stop();
+        if (_pixelFilter != ReadDisplaySettings()) SchedulePreview();
         if (_pointStates.All(state => state == PointState.Ready))
             SetStatus("已进入安全暂停点；可调整 P1/P2，也可继续。", false);
         UpdatePointUiState();

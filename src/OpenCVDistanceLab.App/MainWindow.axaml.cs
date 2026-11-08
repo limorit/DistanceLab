@@ -26,7 +26,7 @@ public sealed partial class MainWindow : Window
     private readonly List<DisplayOption> _displayOptions =
     [
         new(DisplayMethod.LinearContrast, "线性对比度（推荐，低噪声）", "百分位线性拉伸，只改变全局对比度。"),
-        new(DisplayMethod.Original, "原始图像", "保留相机原始色彩，不做显示增强。"),
+        new(DisplayMethod.Original, "原始图像", "主图保留相机色彩，追踪使用原图灰度。"),
         new(DisplayMethod.HistogramEqualization, "全局直方图均衡", "增强全局对比度，也可能放大噪声。"),
         new(DisplayMethod.Clahe, "低强度 CLAHE", "分区限制对比度，适合不均匀照明。"),
         new(DisplayMethod.NlmClahe, "NLM 去噪 + CLAHE", "先去噪，再进行局部增强。"),
@@ -52,6 +52,7 @@ public sealed partial class MainWindow : Window
     private bool _uiReady;
     private long _previewGeneration;
     private PixelFrame? _pixelFrame;
+    private DisplaySettings? _pixelFilter;
     private Bitmap? _previewBitmap;
     private Bitmap? _recognitionP1;
     private Bitmap? _recognitionP2;
@@ -142,7 +143,7 @@ public sealed partial class MainWindow : Window
 
     private async Task ChooseWorkingDirectoryAsync(bool requireSelection)
     {
-        if (_running)
+        if (_running || _starting)
         {
             await MessageDialog.Show(this, "正在追踪", "请先停止当前追踪，再切换工作目录。");
             return;
@@ -216,14 +217,21 @@ public sealed partial class MainWindow : Window
 
     private void SchedulePreview()
     {
-        if (_imagePaths.Count == 0) return;
+        _previewGeneration++;
         _previewTimer.Stop();
+        if (_imagePaths.Count == 0 || !CanLoadPreview)
+        {
+            PreviewBusy.IsVisible = false;
+            return;
+        }
         _previewTimer.Start();
     }
 
+    private bool CanLoadPreview => !_starting && (!_running || (_paused && _pauseConfirmed));
+
     private async Task RefreshPreviewAsync(bool showBusy)
     {
-        if (_imagePaths.Count == 0 || _currentFrame >= _imagePaths.Count) return;
+        if (!CanLoadPreview || _imagePaths.Count == 0 || _currentFrame >= _imagePaths.Count) return;
         long generation = Interlocked.Increment(ref _previewGeneration);
         string path = _imagePaths[_currentFrame];
         DisplaySettings settings = ReadDisplaySettings();
@@ -231,8 +239,8 @@ public sealed partial class MainWindow : Window
         try
         {
             PixelFrame frame = await Task.Run(() => NativeBackend.RenderFrame(path, settings));
-            if (generation != _previewGeneration || _imagePaths[_currentFrame] != path) return;
-            ApplyPixelFrame(frame);
+            if (generation != _previewGeneration || !CanLoadPreview || _imagePaths[_currentFrame] != path) return;
+            ApplyPixelFrame(frame, settings);
         }
         catch (Exception error)
         {
@@ -244,9 +252,10 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ApplyPixelFrame(PixelFrame frame)
+    private void ApplyPixelFrame(PixelFrame frame, DisplaySettings filter)
     {
         _pixelFrame = frame;
+        _pixelFilter = filter;
         Bitmap next = CreateBitmap(frame.PreviewBgra, frame.Width, frame.Height, frame.PreviewStride, PixelFormats.Bgra8888, AlphaFormat.Unpremul);
         Bitmap? old = _previewBitmap;
         _previewBitmap = next;
@@ -406,5 +415,6 @@ public sealed partial class MainWindow : Window
         _recognitionP2?.Dispose();
         _previewBitmap = _recognitionP1 = _recognitionP2 = null;
         _pixelFrame = null;
+        _pixelFilter = null;
     }
 }
